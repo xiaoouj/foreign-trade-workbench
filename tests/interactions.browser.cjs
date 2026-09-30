@@ -1,0 +1,22 @@
+const {chromium}=require(process.env.FTW_PLAYWRIGHT_MODULE||'playwright');
+const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),{spawn}=require('node:child_process'),{once}=require('node:events'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+(async()=>{
+ const data=await fs.mkdtemp(path.join(os.tmpdir(),'orders-filter-')),password=crypto.randomUUID();
+ const server=spawn(process.execPath,['server.js'],{cwd:path.resolve(__dirname,'..'),env:{...process.env,FTW_DATA_DIR:data,FTW_STORAGE:'json',FTW_ADMIN_PASSWORD:password,PORT:'4193'},stdio:['ignore','pipe','pipe']});
+ let log='',browser;server.stdout.on('data',x=>log+=x);server.stderr.on('data',x=>log+=x);
+ try{
+  let ready=false;for(let i=0;i<1200;i++){try{if((await fetch('http://127.0.0.1:4193/api/version')).ok){ready=true;break;}}catch{}if(server.exitCode!==null)throw Error(log);await new Promise(r=>setTimeout(r,100));}assert(ready,log);
+  browser=await chromium.launch({headless:true,executablePath:process.env.FTW_CHROME});const page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/api/fx**',r=>r.fulfill({json:{rates:{CNY:7,USD:1},base:'USD'}}));
+  await page.goto('http://127.0.0.1:4193/#/orders');await page.locator('#loginUser').fill('admin');await page.locator('#loginPwd').fill(password);await page.locator('#loginForm button[type=submit]').click();await page.locator('#view-orders.active').waitFor();
+  if(await page.locator('#updateNotice').isVisible())await page.getByRole('button',{name:'知道了',exact:true}).click();
+  await page.evaluate(()=>{openModal('Interaction test','<input name="text" value="Drag selection test" /><select id="longSelect">'+Array.from({length:80},(_,i)=>'<option>'+i+'</option>').join('')+'</select>');ftwComboScan();});
+  await page.locator('#modalForm .ftw-combo input').click();const list=page.locator('.ftw-combo-list');await list.waitFor();
+  await list.hover();await page.mouse.wheel(0,450);await page.waitForTimeout(200);assert.equal(await list.isVisible(),true);assert((await list.evaluate(e=>e.scrollTop))>0);
+  await page.locator('#modalForm .ftw-combo input').press('ArrowDown');assert.equal(await list.isVisible(),true);
+  await page.locator('#modalForm [name=text]').click();assert.equal(await list.count(),0);
+  const box=await page.locator('#modalForm [name=text]').boundingBox();await page.mouse.move(box.x+30,box.y+15);await page.mouse.down();await page.mouse.move(2,2,{steps:8});await page.mouse.up();await page.waitForTimeout(350);assert.equal(await page.locator('#modal').isVisible(),true);
+  await page.mouse.click(2,2);await page.waitForTimeout(350);assert.equal(await page.locator('#modal').isVisible(),false);
+  assert.deepEqual(errors,[]);console.log('PASS dropdown wheel and keyboard scrolling, outside close, selection drag preserves modal, backdrop click closes');
+ }finally{if(browser)await browser.close();if(server.exitCode===null){server.kill('SIGTERM');await once(server,'exit');}await fs.rm(data,{recursive:true,force:true});}
+})().catch(e=>{console.error(e);process.exitCode=1});

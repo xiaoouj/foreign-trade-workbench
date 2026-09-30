@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${FTW_BIND_ADDRESS:-127.0.0.1}:${PORT:-4173}:4173"
+    environment:
+      NODE_ENV: production
+      PORT: 4173
+      FTW_DATA_DIR: /app/data
+      FTW_STORAGE: json
+      FTW_ADMIN_PASSWORD: ${FTW_ADMIN_PASSWORD:?Set FTW_ADMIN_PASSWORD in .env}
+      FTW_WEBHOOK_SECRET: ${FTW_WEBHOOK_SECRET:-}
+    volumes:
+      - workbench-data:/app/data
+volumes:
+  workbench-data:

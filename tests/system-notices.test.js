@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import { once } from 'node:events';
+import crypto from 'node:crypto';
+const root = path.resolve(new URL('..', import.meta.url).pathname);
+
+test('system notices: publication authorization, archived reads, user isolation and existing follow-up state', {timeout:60000}, async t => {
+  const data = await fs.mkdtemp(path.join(os.tmpdir(),'ftw-update-api-'));
+  const probe=net.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(r=>probe.close(r));
+  const password=crypto.randomUUID();
+  const child=spawn(process.execPath,['server.js'],{cwd:root,env:{...process.env,FTW_DATA_DIR:data,FTW_STORAGE:'json',PORT:String(port),FTW_ADMIN_PASSWORD:password},stdio:['ignore','pipe','pipe']});
+  let log='';child.stdout.on('data',d=>log+=d);child.stderr.on('data',d=>log+=d);
+  t.after(async()=>{if(child.exitCode===null){child.kill('SIGTERM');await once(child,'exit');}await fs.rm(data,{recursive:true,force:true});});
+  const base='http://127.0.0.1:'+port;
+  let ready=false;
+  for(let i=0;i<200;i++){if(child.exitCode!==null)throw Error(log);try{if((await fetch(base+'/api/version')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}
+  assert(ready,log);
+  const get=async(p,user)=>fetch(base+p,{headers:user?{Authorization:'Bearer '+user.token}:{}});
+  const post=async(p,body,user)=>fetch(base+p,{method:'POST',headers:{'Content-Type':'application/json',...(user?{Authorization:'Bearer '+user.token}:{})},body:JSON.stringify(body)});
+  assert.equal((await get('/api/system-notices')).status,401);
+  const admin=await (await post('/api/login',{username:'admin',password})).json();
+  const announcement=(await (await get('/api/announcement',admin)).json()).announcement;
+  let feed=await (await get('/api/system-notices',admin)).json();
+  assert.equal(feed.userId,admin.id);assert(feed.items.some(x=>x.id===announcement.id));assert.equal(feed.unread,feed.items.length);
+  assert.equal((await post('/api/system-notices',{title:'维护通知',content:'仅临时测试\n第二行'},admin)).status,201);
+  await post('/api/users',{username:'manager',password,role:'manager'},admin);
+  const manager=await (await post('/api/login',{username:'manager',password})).json();
+  assert.equal((await post('/api/system-notices',{title:'forbidden',content:'text'},manager)).status,403);
+  feed=await (await get('/api/system-notices',manager)).json();
+  const notice=feed.items.find(x=>x.kind==='system');assert.deepEqual(notice.items,['仅临时测试','第二行']);
+  assert.equal((await post('/api/system-notices/read',{id:notice.id,userId:admin.id},manager)).status,409);
+  assert.equal((await post('/api/system-notices/read',{id:'missing',userId:manager.id},manager)).status,404);
+  const writes=[post('/api/system-notices/read',{id:notice.id,userId:manager.id},manager),post('/api/system-notices/read',{id:announcement.id,userId:manager.id},manager),post('/api/notifications/dismiss',{key:'follow-test'},manager)];
+  for(const r of await Promise.all(writes))assert.equal(r.status,200);
+  assert.equal((await (await get('/api/announcement',manager)).json()).read,true);
+  feed=await (await get('/api/system-notices',manager)).json();assert(feed.items.filter(x=>[notice.id,announcement.id].includes(x.id)).every(x=>x.read));assert(feed.items.filter(x=>![notice.id,announcement.id].includes(x.id)).every(x=>!x.read));assert.equal(feed.unread,feed.items.length-2);
+  assert.equal((await (await get('/api/system-notices',admin)).json()).items.find(x=>x.id===notice.id).read,false);
+  const saved=JSON.parse(await fs.readFile(path.join(data,'notifications.json'),'utf8'));assert.equal(saved[manager.id]['follow-test'].read,true);
+  assert.equal((await post('/api/system-notices',{title:' ',content:'x'},admin)).status,400);
+  assert.equal((await post('/api/system-notices',{title:'x'.repeat(121),content:'x'},admin)).status,400);
+});

@@ -1,0 +1,16 @@
+(() => {
+ const app=document.querySelector('.app'),side=app?.querySelector('.sidebar'),toggle=document.getElementById('sideToggle');if(!app||!side||!toggle)return;
+ const narrow=matchMedia('(max-width:900px)');const key='ftw.sidebar.expanded.v1';let desktopOpen=true;try{desktopOpen=localStorage.getItem(key)!=='false'}catch{}
+ side.id='ftwSidebar';toggle.type='button';toggle.setAttribute('aria-controls',side.id);toggle.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
+ const close=document.createElement('button');close.id='ftwNavClose';close.type='button';close.textContent='×';close.setAttribute('aria-label','收起导航菜单');side.querySelector('.brand').appendChild(close);
+ const mask=document.createElement('button');mask.id='ftwNavBackdrop';mask.type='button';mask.tabIndex=-1;mask.setAttribute('aria-label','关闭导航菜单');app.after(mask);
+ function setOpen(open,remember=false){app.classList.toggle('nav-collapsed',!open);side.inert=!open;side.setAttribute('aria-hidden',String(!open));toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'收起导航菜单':'展开导航菜单');toggle.title=open?'收起导航菜单':'展开导航菜单';document.body.classList.toggle('ftw-nav-mobile-open',open&&narrow.matches);if(remember&&!narrow.matches){desktopOpen=open;try{localStorage.setItem(key,String(open))}catch{}}if(!open&&side.contains(document.activeElement))toggle.focus();if(open&&narrow.matches)close.focus();}
+ toggle.onclick=()=>setOpen(app.classList.contains('nav-collapsed'),true);close.onclick=()=>{setOpen(false,true);toggle.focus()};mask.onclick=()=>{setOpen(false);toggle.focus()};
+ side.addEventListener('click',e=>{if(narrow.matches&&e.target.closest('[data-view]'))setOpen(false)});
+ document.addEventListener('keydown',e=>{if(app.classList.contains('nav-collapsed'))return;if(e.key==='Escape'&&narrow.matches&&!e.defaultPrevented&&!document.querySelector('#modal.open')&&!document.querySelector('#clientDrawer.open')){setOpen(false,true);toggle.focus()}if(e.key==='Tab'&&narrow.matches){const els=[...side.querySelectorAll('button,input,a[href],[tabindex="0"]')].filter(x=>x.offsetParent!==null&&!x.disabled);if(!els.length)return;const first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+ narrow.addEventListener('change',()=>setOpen(narrow.matches?false:desktopOpen));setOpen(narrow.matches?false:desktopOpen);
+ const modal=document.getElementById('modal'),form=document.getElementById('modalForm');
+ if(modal){modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','modalTitle');new MutationObserver(()=>document.body.classList.toggle('ftw-modal-open',modal.classList.contains('open'))).observe(modal,{attributes:true,attributeFilter:['class']});}
+ if(form)new MutationObserver(()=>{form.querySelectorAll(':scope > table').forEach(table=>{const wrap=document.createElement('div');wrap.className='ftw-modal-table-scroll';table.before(wrap);wrap.append(table)})}).observe(form,{childList:true});
+ window.addEventListener('resize',()=>{if(document.querySelector('#modal.open')&&typeof resetModalDrag==='function')resetModalDrag()});
+})();

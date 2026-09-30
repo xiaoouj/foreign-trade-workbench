@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SalesFlow · 外贸人工作台新仪表盘</title>
+<link rel="stylesheet" href="salesflow.css" />
+  <link rel="stylesheet" href="update-notice.css?v=20260921a" />
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+      </div>
+      <div>
+        <div class="name">SalesFlow</div>
+        <div class="sub">外贸人工作台</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">工作台</div>
+      <div class="nav-item active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">仪表盘</span>
+      </div>
+      <div class="nav-item" data-view="leads">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">线索</span>
+        <span class="nav-badge" id="badgeLeads">·</span>
+      </div>
+      <div class="nav-item" data-view="pipeline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="6" cy="18" r="3"/><line x1="18" y1="3" x2="18" y2="9"/><circle cx="18" cy="12" r="3"/><line x1="6" y1="15" x2="18" y2="12"/></svg>
+        <span class="nav-label">商机看板</span>
+      </div>
+      <div class="nav-item" data-view="clients">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">客户</span>
+        <span class="nav-badge" id="badgeClients" style="background:var(--n-400)">·</span>
+      </div>
+      <div class="nav-section">说明</div>
+      <div class="nav-item" id="openMainApp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        <span class="nav-label">返回原工作台</span>
+      </div>
+    </nav>
+    <div class="side-foot">
+      <div class="who">
+        <div class="avatar" id="sideAvatar">?</div>
+        <div>
+          <div style="font-weight:var(--fw-6); font-size:var(--fs-sm)" id="sideName">加载中…</div>
+          <div style="font-size:var(--fs-xs); color:var(--text-3)" id="sideRole"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="toggleSidebar" title="折叠侧栏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div>
+        <div class="crumb" id="crumb">工作台 / 概览</div>
+        <div class="page-title" id="pageTitle">仪表盘</div>
+      </div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="globalSearch" placeholder="搜索客户 / 线索 / 商机…" />
+      </div>
+      <button class="icon-btn" id="themeToggle" title="切换明/暗主题">
+        <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="icon-btn" id="refreshBtn" title="刷新数据">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button class="btn btn--primary" id="newDealBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新建商机
+      </button>
+    </header>
+
+    <main class="content" id="content">
+      <!-- filled by JS -->
+      <div class="loading">正在从外贸人工作台加载真实数据…</div>
+    </main>
+  </div>
+</div>
+
+<!-- ============ LOGIN OVERLAY ============ -->
+<div class="overlay" id="loginOverlay" style="display:none">
+  <div class="login-card card">
+    <div class="brand" style="border:none;padding:0 0 16px">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>
+      <div><div class="name">SalesFlow</div><div class="sub">登录外贸人工作台</div></div>
+    </div>
+    <div id="loginErr" class="login-err" style="display:none"></div>
+    <input id="loginUser" class="form-input" placeholder="用户名" />
+    <input id="loginPw" class="form-input" type="password" placeholder="密码" />
+    <button class="btn btn--primary" id="loginBtn" style="width:100%; justify-content:center">登录</button>
+    <div class="hint">登录后本页将读取你的真实客户、商机与线索数据。</div>
+  </div>
+</div>
+
+<script src="salesflow.js?v=20260921a"></script>
+  <script src="update-notice.js?v=20260921b"></script>
+</body>
+</html>

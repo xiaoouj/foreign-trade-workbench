@@ -1,0 +1,15 @@
+/* ===== 通用可检索下拉（ftw-combo）===== */
+.ftw-combo { position: relative; display: inline-flex; align-items: center; max-width: 100%; }
+.ftw-combo > input { width: 100%; min-width: 0; box-sizing: border-box; outline: none; }
+.ftw-combo > input::placeholder { color: #9aa4b2; }
+.ftw-combo-list {
+  position: fixed; z-index: 99999; background: #fff; color: #1f2937;
+  border: 1px solid #d0d5dd; border-radius: 8px; box-shadow: 0 8px 24px rgba(16,24,40,.14);
+  max-height: 240px; overflow: auto; min-width: 140px; padding: 4px; font-size: 13px;
+}
+.ftw-combo-item { padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ftw-combo-item:hover, .ftw-combo-item.active { background: #eef4ff; }
+.ftw-combo-item.sel { color: #2563eb; font-weight: 600; }
+.ftw-combo-item.empty { color: #98a2b3; cursor: default; background: none; }
+
+.ftw-combo-list{overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}

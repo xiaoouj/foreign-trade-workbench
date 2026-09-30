@@ -1,0 +1,14 @@
+.ftw-update-card { position:fixed; right:24px; bottom:24px; z-index:10050; width:min(400px,calc(100vw - 32px)); box-sizing:border-box; padding:22px; border:1px solid #dce4ee; border-radius:16px; background:#fff; color:#172b46; box-shadow:0 12px 40px #172b4629; font:14px/1.65 system-ui,sans-serif; }
+.ftw-update-card[hidden],.ftw-update-card button[hidden] { display:none!important; }
+.ftw-update-card h3,.ftw-update-confirm h3 { margin:0 0 10px; font-size:17px; }
+.ftw-update-body { max-height:45vh; overflow:auto; overflow-wrap:anywhere; }
+.ftw-update-body p { margin:8px 0; }
+.ftw-update-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.ftw-update-actions button { appearance:none; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#172b46; padding:9px 14px; cursor:pointer; font:inherit; }
+.ftw-update-actions button:last-child { background:#2458ca; color:#fff; border-color:#2458ca; }
+.ftw-update-actions button:focus-visible { outline:3px solid #81a7ff; outline-offset:3px; }
+.ftw-update-actions button:disabled { opacity:.6; cursor:wait; }
+.ftw-update-confirm { width:min(440px,calc(100vw - 48px)); box-sizing:border-box; padding:24px; border:0; border-radius:16px; color:#172b46; font:14px/1.7 system-ui,sans-serif; }
+.ftw-update-confirm::backdrop { background:#172b4666; }
+.ftw-update-live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media(max-width:480px) { .ftw-update-card { right:16px; bottom:16px; padding:18px; } }

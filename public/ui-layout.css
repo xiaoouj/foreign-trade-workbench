@@ -1,0 +1,159 @@
+/* Scoped layout corrections for the existing CRM. */
+html body .app{min-width:0;flex-direction:row}
+html body .app>.content{min-width:0;width:100%}
+html body .app>.sidebar{width:var(--side-w,246px);flex:0 0 var(--side-w,246px);height:100dvh;top:0;bottom:auto;left:auto;right:auto;position:sticky;flex-direction:column;overflow:hidden;transition:width .18s,flex-basis .18s}
+html body .app.nav-collapsed>.sidebar{width:0!important;flex-basis:0!important;border:0;visibility:hidden}
+#sideToggle{display:inline-flex!important;align-items:center;justify-content:center;flex-shrink:0;width:40px;min-width:40px;height:40px;font-size:22px}
+#sideToggle svg{width:20px;height:20px;stroke:currentColor;stroke-width:2;fill:none}
+#ftwNavClose{position:absolute;right:7px;top:8px;background:transparent;border:0;color:inherit;cursor:pointer;font-size:22px;line-height:1;width:32px;height:32px}
+.sidebar .brand{position:relative;padding-right:38px!important}
+#ftwNavBackdrop{display:none;position:fixed;inset:0;background:rgba(9,14,28,.46);z-index:39;border:0;border-radius:0}
+html body .topbar{height:auto;min-height:64px;box-sizing:border-box;gap:12px;padding:10px 20px}
+html body .tb-left{flex:0 1 auto;min-width:0;gap:10px}
+html body .tb-titles{min-width:0}.tb-title,.tb-crumb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body .tb-right{flex:1 1 auto;min-width:0;justify-content:flex-end;gap:10px}
+html body .tb-search{display:flex;min-width:100px;width:clamp(150px,25vw,340px);max-width:100%;flex:0 1 340px}
+html body .tb-search input{min-width:0;width:100%;box-sizing:border-box}
+html body .tb-right>button,html body .tb-avatar{flex-shrink:0}
+html body #view-dashboard>.stat-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+html body #worldClocks.ftw-clock-panel{background:var(--panel,#fff);min-width:0;box-sizing:border-box}
+html body .ftw-clock-item{min-width:0;overflow-wrap:anywhere}
+html body .ftw-clock-toolbar{flex-wrap:wrap}
+/* One constrained dialog surface; only its content scrolls. */
+html body #modal.open{padding:20px;box-sizing:border-box;align-items:center;overflow:hidden}
+html body #modal .modal-box{width:min(760px,100%);max-width:100%;max-height:calc(100dvh - 40px);height:auto;min-height:0;box-sizing:border-box;overflow:hidden;animation:none;border-radius:16px}
+html body #modal .modal-box--wide{width:min(1040px,100%)}
+html body #modal .modal-head,html body #modal .modal-footbar{flex:0 0 auto;min-width:0;box-sizing:border-box;flex-wrap:wrap;gap:10px}
+html body #modal .modal-head h3{white-space:normal;overflow-wrap:anywhere;flex:1;min-width:0}
+html body #modal .modal-head .x{flex-shrink:0}
+html body #modalForm{min-width:0;min-height:0;max-width:100%;box-sizing:border-box;overflow:auto;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;grid-auto-rows:max-content;padding:20px;gap:16px;flex:1 1 auto;scrollbar-gutter:stable}
+html body #modalForm.modal-form--plain{display:block}
+html body #modalForm::after{display:none}
+html body #modalForm>*{min-width:0;max-width:100%;box-sizing:border-box}
+html body #modalForm .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+html body #modalForm .field{min-width:0;max-width:100%}
+html body #modalForm input:not([type=checkbox]):not([type=radio]),html body #modalForm select,html body #modalForm textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+html body #modalForm .combo,html body #modalForm .combo-wrap{width:100%;min-width:0;max-width:100%}
+html body #modalForm .field label{font-size:14px}
+html body #modalForm .field input,html body #modalForm .field select,html body #modalForm .field textarea{font-size:14px}
+html body #modalForm pre{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+html body #modalForm table{max-width:100%}
+html body #modalForm .ftw-modal-table-scroll{min-width:0;max-width:100%;overflow-x:auto;grid-column:1/-1}
+body.ftw-modal-open{overflow:hidden}
+@media(min-width:1600px){html body #view-dashboard>.stat-row{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(max-width:900px){
+html body .app>.sidebar{position:fixed;left:0;top:0;bottom:0;right:auto;height:100dvh;width:min(290px,86vw)!important;flex-basis:auto;z-index:40;visibility:visible;transform:translateX(0);transition:transform .18s;overflow:hidden}
+html body .app.nav-collapsed>.sidebar{width:min(290px,86vw)!important;transform:translateX(-100%);visibility:hidden}
+html body .sidebar .brand{display:flex;flex-shrink:0}
+html body .sidebar .nav{display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;padding:12px;gap:5px;min-height:0;flex:1}
+html body .sidebar .nav-group{margin-top:8px}
+html body .sidebar .nav-group-title{display:flex}
+html body .sidebar .nav-group-items{flex-direction:column}
+html body .sidebar .nav-item{white-space:normal;text-align:left;border-radius:8px;flex-shrink:0}
+html body .sidebar .side-foot{display:block;flex-shrink:0}
+html body .app:not(.nav-collapsed)~#ftwNavBackdrop{display:block}
+body.ftw-nav-mobile-open{overflow:hidden}
+html body .content main{padding-bottom:20px}
+}
+@media(max-width:640px){
+html body .topbar{display:flex;flex-wrap:wrap;padding:10px 12px;gap:8px}
+html body .tb-left{flex:1 1 auto}.tb-titles .tb-crumb{display:none}
+html body .tb-right{display:contents}
+html body .tb-search{display:flex!important;order:10;flex:1 1 100%;width:100%;max-width:none}
+html body .tb-right>button{margin:0}.tb-title{max-width:115px}
+html body #modal.open{padding:8px}
+html body #modal .modal-box,html body #modal .modal-box--wide{width:100%;height:auto;max-height:calc(100dvh - 16px);border-radius:12px;transform:none!important;left:0!important;top:0!important}
+html body #modalForm:not(.modal-form--plain),html body #modalForm .form-grid{grid-template-columns:minmax(0,1fr)}
+html body #modalForm{padding:16px;gap:14px}
+html body #modal .modal-head,html body #modal .modal-footbar{padding:12px 16px}
+html body #view-dashboard>.stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){html body .app>.sidebar{transition:none}}
+/* Quotation editor: clear sections and legible item columns. */
+html body #modalForm:has(#qtLines)>.form-grid{margin:0;padding:18px;background:var(--bg-2,#f6f8fb);border:1px solid var(--line,#dde3e8);border-radius:12px;gap:14px 20px}
+html body #modalForm:has(#qtLines)>.form-grid::before{content:'报价信息';grid-column:1/-1;font-size:15px;font-weight:700;margin-bottom:2px}
+html body #modalForm .qt-lines-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;margin:0}
+html body #modalForm .qt-lines{display:flex;flex-direction:column;gap:14px;min-width:0}
+html body #modalForm .qt-line{padding:18px;border:1px solid var(--line,#dde3e8);border-radius:12px;background:var(--panel,#fff);min-width:0;margin:0}
+html body #modalForm .qt-line-grid{display:grid;grid-template-columns:minmax(100px,1fr) minmax(160px,2fr) minmax(60px,.65fr) minmax(60px,.65fr) minmax(100px,1fr) minmax(90px,1fr);gap:12px;align-items:end;margin-bottom:14px}
+html body #modalForm .qt-subtotal{min-height:40px;display:flex;align-items:center;font-size:16px;font-weight:700;color:var(--brand-ink,var(--ink));font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+html body #modalForm .qt-total{padding:16px 20px;border-radius:10px;background:var(--brand-soft,#edf3ff);font-size:16px;text-align:right;margin:0}
+html body #qtTotalDisplay{font-size:23px;font-weight:750;font-variant-numeric:tabular-nums}
+html body #modalForm .qt-del-line{margin-top:10px}
+html body #modalForm :is(input,select,button){min-height:36px}
+html body #modalForm input:is([type=checkbox],[type=radio]){min-height:0}
+@media(max-width:1000px){html body #modalForm .qt-line-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){html body #modalForm .qt-line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}html body #modalForm:has(#qtLines)>.form-grid,html body #modalForm .qt-line{padding:12px}}
+@media(min-width:1001px){
+html body #modalForm:has(#qtLines)>.form-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px;padding:16px}
+html body #modalForm:has(#qtLines)>.form-grid>.field:has([name=paymentTerms]){grid-column:span 2}
+html body #modalForm:has(#qtLines)>.form-grid>.field:has([name=owner]){grid-column:auto}
+html body #modalForm:has(#qtLines)>.form-grid>.field:has([name=notes]) textarea{min-height:60px;height:60px}
+}
+/* Orders keep readable columns instead of compressing country/status/date to vertical text. */
+html body table:has(> #orderBody){min-width:1240px!important;width:100%;table-layout:auto!important;border-collapse:separate;border-spacing:0}
+html body #orderBody td,html body table:has(> #orderBody) th{white-space:nowrap;word-break:normal;overflow-wrap:normal;vertical-align:middle}
+html body #orderBody td:has(.order-detail-link){min-width:190px;max-width:300px;white-space:normal}
+html body #orderBody td:has(.date),html body #orderBody td.date{min-width:112px}
+html body #orderBody td.order-actions,html body table:has(> #orderBody) th[data-col="c9"]{position:sticky;right:0;min-width:140px;width:140px;background:var(--panel,#fff);z-index:3;white-space:nowrap;padding:12px}
+html body table:has(> #orderBody) thead th[data-col="c9"]{z-index:5;top:0}
+html body #orderBody td:not(.order-actions){position:static}
+html body #orderBody .action-btn{position:relative;flex-shrink:0;transform:none;transition:color .12s,background-color .12s,border-color .12s}
+html body #orderBody .action-btn svg{pointer-events:none}
+html body .order-detail-link{background:transparent;border:0;padding:3px 0;color:var(--brand-ink,var(--ink));font:inherit;font-weight:650;text-align:left;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
+html body .order-detail-link:hover{text-decoration:underline}
+html body .order-detail-link:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.order-detail-head{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:18px}.order-detail-head h2{font-size:24px;margin:5px 0}.order-detail-head p{margin:0}.order-detail-status{padding:6px 12px;border-radius:8px;background:var(--brand-soft);white-space:nowrap}.order-detail-amount{background:var(--bg-2);border:1px solid var(--line);padding:18px;border-radius:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.order-detail-amount strong{font-size:24px;font-variant-numeric:tabular-nums}.order-detail-amount small{color:var(--muted)}.order-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:24px 0}.order-detail-field dt{font-size:13px;color:var(--muted);margin-bottom:6px}.order-detail-field dd{margin:0;font-size:15px;overflow-wrap:anywhere}.order-detail-notes{border-top:1px solid var(--line);padding-top:14px}.order-detail-notes h3{font-size:14px}.order-detail-notes p{white-space:pre-wrap;overflow-wrap:anywhere}.order-client-link{margin-top:20px;border:1px solid var(--line);padding:16px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:16px}.order-client-link p{font-size:13px;color:var(--muted);margin:5px 0 0}.order-client-link button{flex-shrink:0}@media(max-width:640px){.order-detail-grid{grid-template-columns:1fr}.order-client-link{align-items:flex-start;flex-direction:column}.order-detail-head{align-items:flex-start}}
+
+@media(min-width:900px){.order-detail-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Compact dashboard creation shortcuts above world clocks. */
+#view-dashboard .dashboard-quick{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:8px 12px;border:1px solid var(--line,#dde3e8);border-radius:12px;background:var(--card,#fff)}
+#view-dashboard .dashboard-quick-label{font-size:12px;font-weight:600;white-space:nowrap;color:var(--ink-soft,#64748b)}
+#view-dashboard .dashboard-quick .quick-actions{display:flex;flex-wrap:wrap;gap:6px;min-width:0;margin:0}
+#view-dashboard .dashboard-quick .qa-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;min-height:32px;padding:6px 10px;font-size:12px;border-radius:8px;margin:0}
+#view-dashboard .dashboard-quick .qa-icon{font-size:14px;width:auto;height:auto;margin:0}
+#view-dashboard .dashboard-quick .qa-label{font-size:12px}
+#view-dashboard .dashboard-opportunities{grid-template-columns:minmax(0,1fr)}
+@media(max-width:480px){#view-dashboard .dashboard-quick{align-items:flex-start;gap:8px;padding:8px}#view-dashboard .dashboard-quick-label{padding-top:8px}#view-dashboard .dashboard-quick .quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1}#view-dashboard .dashboard-quick .qa-btn{padding:6px}}
+
+#revenueTrend{position:relative}#revenueTrend svg{touch-action:pan-y}#revenueTrend .rt-tooltip{position:absolute;z-index:5;pointer-events:none;max-width:100%;box-sizing:border-box;padding:8px 12px;border-radius:8px;background:#17243b;color:#fff;font-size:12px;line-height:1.5;box-shadow:0 4px 14px #17243b33;white-space:nowrap}#revenueTrend .rt-tooltip[hidden]{display:none}#revenueTrend svg:focus-visible{outline:2px solid var(--brand,#2563eb);outline-offset:3px}
+
+#view-docs .doc-bank-picker{display:flex;flex-wrap:wrap;align-items:center;gap:8px}#view-docs .doc-bank-picker>.ftw-combo,#view-docs .doc-bank-picker>select{flex:1;min-width:180px}#view-docs .party-block>.field{margin-bottom:14px}
+#view-docs #d_items .ihead{display:none!important}#view-docs #d_items .irow-item,#view-docs #d_items .cols-pack:not(.ihead){padding:12px;margin:10px 0;border:1px solid var(--line,#ddd);border-radius:10px;background:var(--card,#fff)}
+#view-docs #d_items .irow-line,#view-docs #d_items .cols-pack:not(.ihead){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px;align-items:end}
+#view-docs #d_items .doc-item-field{display:flex;flex-direction:column;gap:5px;min-width:0;margin:0;font-size:12px}#view-docs #d_items .doc-item-field>span{color:var(--ink-soft,#64748b);font-weight:600}#view-docs #d_items .doc-item-field>input,#view-docs #d_items .doc-item-field>textarea{width:100%!important;min-width:0;box-sizing:border-box}
+#view-docs #d_items .field-name,#view-docs #d_items .field-description{grid-column:1/-1}#view-docs #d_items .field-parameters{width:100%;margin-top:10px}#view-docs #d_items .imgfile{display:none!important}#view-docs #d_items .imgbtn,#view-docs #d_items .delrow{width:36px;height:34px;margin:0}#view-docs #d_items .delrow{justify-self:end;grid-column:-2/-1}
+@media(max-width:480px){#view-docs #d_items .irow-line,#view-docs #d_items .cols-pack:not(.ihead){grid-template-columns:repeat(2,minmax(0,1fr))!important}#view-docs .docs-form{min-width:0}#view-docs .doc-bank-picker>.ftw-combo{flex-basis:100%}}
+#view-docs .docs-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#view-docs .docs-layout>*{min-width:0;max-width:100%;box-sizing:border-box}#view-docs .docs-form .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#view-docs .docs-form .field{min-width:0}#view-docs .docs-form input,#view-docs .docs-form textarea{max-width:100%;box-sizing:border-box}
+@media(max-width:1100px){#view-docs .docs-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){#view-docs .docs-form .form-grid{grid-template-columns:minmax(0,1fr)}#view-docs .docs-form .party-block{padding:12px}#view-docs .doc-settings{padding:10px}}
+
+.side-foot .data-status{display:flex;flex-direction:column;gap:4px;padding:8px 10px;font-size:11px;line-height:1.4;color:var(--muted,#94a3b8)}.side-foot .data-status time{font-variant-numeric:tabular-nums;font-size:12px;color:inherit}
+
+#oiRows .oi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border:1px solid var(--line,#ddd);border-radius:10px;padding:12px;margin:10px 0}#oiRows label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px}#oiRows .oi-wide{grid-column:1/-1}#oiRows input,#oiRows textarea{width:100%;min-width:0;box-sizing:border-box}#oiRows .oi-remove{justify-self:start}.oi-detail-table{overflow:auto}.oi-detail-table table{width:100%;min-width:540px;border-collapse:collapse}.oi-detail-table th,.oi-detail-table td{text-align:left;padding:10px;border-bottom:1px solid var(--line,#ddd)}.oi-detail-table th{white-space:nowrap}.oi-description{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:var(--muted,#64748b);max-width:400px}.order-items-editor .items-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}#orderColumns{white-space:nowrap}
+@media(max-width:480px){#oiRows .oi-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+#view-orders>.stat-row{grid-template-columns:repeat(3,minmax(0,1fr))}#view-orders>.stat-row .sc-num{font-size:clamp(20px,2.5vw,30px);overflow-wrap:anywhere}#bmResult{font-size:13px;overflow-wrap:anywhere}#bmResult ul{padding-left:20px;max-height:200px;overflow:auto}@media(max-width:600px){#view-orders>.stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Compact column settings: common visibility controls first, optional renaming. */
+html body #modal .modal-box--columns{width:min(620px,100%)}
+html body #modalForm:has(.col-cfg-compact){padding:16px 20px;scrollbar-gutter:auto}
+.col-cfg-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.col-cfg-summary,.col-cfg-hint{font-size:12px;color:var(--ink-soft,#64748b)}
+#colRenameToggle{border:0;background:transparent;color:var(--brand,#2563eb);font:inherit;font-size:12px;cursor:pointer;padding:6px}
+html body #modalForm .col-cfg-compact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;max-height:50vh;overflow:auto}
+html body #modalForm .col-cfg-row{display:flex;flex-wrap:wrap;gap:6px;min-height:38px;padding:5px 8px;border:1px solid var(--line,#e2e8f0);border-radius:8px;box-sizing:border-box;background:var(--panel,#fff)}
+html body #modalForm .col-cfg-choice{display:flex;align-items:center;gap:8px;flex:1;min-width:0;margin:0;cursor:pointer}
+html body #modalForm .col-cfg-name{width:auto;flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--ink,#1e293b)}
+html body #modalForm .col-cfg-row input[type=checkbox]{width:15px;height:15px;min-height:15px;margin:0;accent-color:var(--brand,#2563eb)}
+html body #modalForm .col-cfg-mv{flex-direction:row;gap:3px}
+html body #modalForm .col-cfg-mv button{width:26px;height:26px;min-height:26px;font-size:14px;line-height:1;border-color:transparent;background:var(--bg-2,#f8fafc)}
+html body #modalForm .col-cfg-row .col-cfg-rename{display:none;flex-basis:100%;width:100%;padding:5px 8px;font-size:12px}
+html body #modalForm .col-cfg-edit-labels .col-cfg-rename:not(:disabled){display:block}
+.col-cfg-fixed{font-size:11px;color:var(--ink-soft,#94a3b8);padding:0 4px}
+.col-cfg-hint{margin:10px 0 0}
+@media(max-width:540px){html body #modalForm .col-cfg-compact{grid-template-columns:minmax(0,1fr);max-height:48vh}html body #modalForm:has(.col-cfg-compact){padding:12px}.col-cfg-toolbar{gap:6px}}
+
+html body #modalForm #colRenameToggle{min-height:28px}
+@media(max-width:540px){html body #modalForm .col-cfg-mv button{width:30px;height:30px;min-height:30px}}

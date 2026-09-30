@@ -1,0 +1,20 @@
+{
+  "name": "ftw-connectors",
+  "version": "1.0.0",
+  "description": "外贸人工作台消息接入端：WhatsApp(Baileys) 收信 + 邮箱(IMAP) 收信",
+  "type": "module",
+  "scripts": {
+    "start:whatsapp": "node whatsapp-connector.mjs",
+    "start:email": "node email-connector.mjs"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "imapflow": "^1.0.164",
+    "mailparser": "^3.7.2",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme-style="blue">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>外贸工作台 · 外贸工作台</title>
+  <link rel="stylesheet" href="styles.css?v=20260928orders1" />
+  <!-- 下拉检索增强（select → 可输入检索选项框）：combo.js 全局自动扫描，data-no-combo 可排除 -->
+  <link rel="stylesheet" href="combo.css?v=20260831a" />
+  <link rel="stylesheet" href="ui-layout.css?v=20260921b" />
+  <link rel="stylesheet" href="calc.css?v=20260923b" />
+  <link rel="stylesheet" href="update-notice.css?v=20260921a" />
+  <link rel="stylesheet" href="analytics.css?v=20260928a" />
+  <link rel="stylesheet" href="crm-ui.css?v=20260929refine1" />
+</head>
+<body>
+  <!-- 侧栏 SVG 图标雪碧图：全部用 currentColor 描边，随主题风格变描边 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="ico-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9"/><rect x="13.5" y="3" width="7.5" height="5"/><rect x="13.5" y="11" width="7.5" height="10"/><rect x="3" y="15" width="7.5" height="6"/></symbol>
+      <symbol id="ico-clients" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.2"/><path d="M15.4 14.6c2.6.5 5.1 2.6 5.1 5.4"/></symbol>
+      <symbol id="ico-enquiry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M3 13l3-9h12l3 9"/><path d="M3 13v7h18v-7"/><path d="M9 13h6l-1.4 3.2h-3.2z"/></symbol>
+      <symbol id="ico-orders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></symbol>
+      <symbol id="ico-quotation" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></symbol>
+      <symbol id="ico-shipments" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M3 14l2-6h11l4 4v6H3z"/><path d="M3 14v4h18"/><circle cx="8" cy="18" r="1.4"/><circle cx="17" cy="18" r="1.4"/></symbol>
+      <symbol id="ico-docs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M6 2h9l4 4v16H6z"/><path d="M15 2v4h4"/><path d="M9 12h6M9 16h6"/></symbol>
+      <symbol id="ico-tasks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 14l2 2 4-4"/></symbol>
+      <symbol id="ico-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-7M20 16v-10"/></symbol>
+      <symbol id="ico-reports" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/></symbol>
+      <symbol id="ico-products" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M5 7h14l-1 13H6z"/><path d="M9 7a3 3 0 0 1 6 0"/></symbol>
+      <symbol id="ico-emails" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M21 3L3 11l7 3 3 7z"/><path d="M21 3l-8 11"/><path d="M10 14l4-4"/></symbol>
+      <symbol id="ico-comms" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></symbol>
+      <symbol id="ico-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 6l9 7 9-7"/></symbol>
+      <symbol id="ico-chatlog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8 11h8M8 14h8M8 17h5"/></symbol>
+      <symbol id="ico-performance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></symbol>
+      <symbol id="ico-finance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 8l4 4 4-4M12 12v6M9 14h6M9 16.5h6"/></symbol>
+      <symbol id="ico-suppliers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M3 20V9l5 3V9l5 3V9l5 3v8z"/><path d="M3 20h18"/><path d="M7 20v-3M11 20v-3M15 20v-3"/></symbol>
+      <symbol id="ico-audit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8 13l2 2 4-4"/></symbol>
+      <symbol id="ico-calc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M9 6h6"/><path d="M9 11h6M9 14.5h6M9 18h6"/></symbol>
+      <symbol id="ico-reminders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+      <symbol id="ico-knowledge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h6v16H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-6"/><path d="M12 19h6a2 2 0 0 1 2 2V7a2 2 0 0 0-2-2"/></symbol>
+      <symbol id="ico-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">CA</span>
+      <div>
+        <div class="brand-title">外贸工作台</div>
+        <div class="brand-sub">外贸业务工作台</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-group" data-group="overview">
+        <div class="nav-group-title"><span>概览</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item active" data-view="dashboard"><svg class="nav-ico"><use href="#ico-dashboard"/></svg>工作台</button>
+        </div>
+      </div>
+      <div class="nav-group" data-group="development">
+        <div class="nav-group-title"><span>客户开发</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="clients"><svg class="nav-ico"><use href="#ico-clients"/></svg>客户资料</button>
+          <button class="nav-item" data-view="enquiry"><svg class="nav-ico"><use href="#ico-enquiry"/></svg>询盘 / 商机</button>
+          <button class="nav-item" data-view="emails"><svg class="nav-ico"><use href="#ico-emails"/></svg>开发信</button>
+          <button class="nav-item" data-view="comms"><svg class="nav-ico"><use href="#ico-comms"/></svg>沟通</button>
+        </div>
+      </div>
+      <div class="nav-group" data-group="sales">
+        <div class="nav-group-title"><span>销售业务</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="quotations"><svg class="nav-ico"><use href="#ico-quotation"/></svg>报价管理</button>
+          <button class="nav-item" data-view="orders"><svg class="nav-ico"><use href="#ico-orders"/></svg>订单数据</button>
+          <button class="nav-item" data-view="docs"><svg class="nav-ico"><use href="#ico-docs"/></svg>单证生成</button>
+          <button class="nav-item" data-view="tasks"><svg class="nav-ico"><use href="#ico-tasks"/></svg>任务日历</button>
+          <button class="nav-item" data-view="reminders"><svg class="nav-ico"><use href="#ico-reminders"/></svg>提醒中心</button>
+        </div>
+      </div>
+      <div class="nav-group" data-group="delivery">
+        <div class="nav-group-title"><span>供应链与交付</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="products"><svg class="nav-ico"><use href="#ico-products"/></svg>产品库</button>
+          <button class="nav-item" data-view="suppliers"><svg class="nav-ico"><use href="#ico-suppliers"/></svg>供应商</button>
+          <button class="nav-item" data-view="knowledge"><svg class="nav-ico"><use href="#ico-knowledge"/></svg>资料/知识库</button>
+          <button class="nav-item" data-view="shipments"><svg class="nav-ico"><use href="#ico-shipments"/></svg>出货</button>
+        </div>
+      </div>
+      <div class="nav-group" data-group="analytics">
+        <div class="nav-group-title"><span>数据分析</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="inqstats"><svg class="nav-ico"><use href="#ico-chart"/></svg>询盘分析</button>
+          <button class="nav-item" data-view="performance"><svg class="nav-ico"><use href="#ico-performance"/></svg>业绩进度</button>
+          <button class="nav-item" data-view="finance"><svg class="nav-ico"><use href="#ico-finance"/></svg>财务</button>
+          <button class="nav-item" data-view="reports"><svg class="nav-ico"><use href="#ico-reports"/></svg>报表导出</button>
+        </div>
+      </div>
+      <div class="nav-group" data-group="system">
+        <div class="nav-group-title"><span>系统管理</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="audit" data-admin-only><svg class="nav-ico"><use href="#ico-audit"/></svg>操作日志</button>
+          <button class="nav-item" data-view="settings"><svg class="nav-ico"><use href="#ico-settings"/></svg>设置</button>
+        </div>
+      </div>
+      <div class="nav-group" data-group="tools">
+        <div class="nav-group-title"><span>工具</span><span class="ng-arrow">▾</span></div>
+        <div class="nav-group-items">
+          <button class="nav-item" data-view="calc"><svg class="nav-ico"><use href="#ico-calc"/></svg>计算器</button>
+        </div>
+      </div>
+    </nav>
+    <div class="side-foot">
+      <div id="userBar" class="user-bar"></div>
+      <div class="rate-foot"><span id="connDot" class="dot" title="汇率源状态"></span><span id="rateSource" class="rate-source">汇率源: --</span></div>
+      <div class="data-status" id="dataFreshness" title="客户、订单、询盘、报价、任务、产品、供应商、出货中，当前账号可见记录的最新修改时间；不是数据库备份时间。"><span>可见业务数据最新更新</span><time id="dataFreshnessTime">等待加载</time></div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <div class="tb-left">
+        <button class="tb-icon" id="sideToggle" title="折叠 / 展开菜单">☰</button>
+        <div class="tb-titles">
+          <div class="tb-title" id="pageTitle">仪表盘</div>
+          <div class="tb-crumb" id="pageBreadcrumb">外贸CRM系统</div>
+        </div>
+      </div>
+      <div class="tb-right">
+        <button class="tb-create" id="tbCreate" type="button">+ 新建</button>
+        <div class="tb-search">
+          <span class="tb-search-ico">🔍</span>
+          <input id="globalSearch" placeholder="搜索客户 / 询盘 / 订单…" />
+        </div>
+        <button class="tb-icon" id="tbRate" title="刷新汇率">💱</button>
+        <button class="tb-bell" id="tbBell" title="提醒中心"><span class="bell-ico">🔔</span><span id="bellBadge" class="bell-badge hidden">0</span></button>
+        <div class="tb-avatar" id="tbAvatar" title="账户">A</div>
+      </div>
+    </header>
+    <main>
+    <!-- ============ 仪表盘 ============ -->
+    <section id="view-dashboard" class="view active">
+      <div class="world-clocks" id="worldClocks"></div>
+      <div class="dashboard-quick" aria-label="快捷操作"><span class="dashboard-quick-label">快捷操作</span><div class="quick-actions">
+              <button class="qa-btn" id="qaQuote"><span class="qa-icon">📋</span><span class="qa-label">新建报价</span></button>
+              <button class="qa-btn" id="qaClient"><span class="qa-icon">👤</span><span class="qa-label">新建客户</span></button>
+              <button class="qa-btn" id="qaPI"><span class="qa-icon">📄</span><span class="qa-label">新建 PI</span></button>
+              <button class="qa-btn" id="qaPL"><span class="qa-icon">📦</span><span class="qa-label">新建装箱单</span></button>
+            </div></div>
+      <div class="welcome-row">
+        <div class="welcome">
+          <div class="page-eyebrow">WORKSPACE <span id="dashDate"></span></div><h1 id="dashGreeting">今日工作台</h1>
+          <p id="dashHint">正在加载今日工作摘要…</p>
+        </div>
+        
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card sc-today" data-go="refresh">
+          <div class="sc-title">待跟进询盘</div>
+          <div class="sc-num"><span id="statFollow">0</span><span class="sc-unit">条</span></div>
+          <div class="sc-sub">本地实时数据 · 点击刷新</div>
+        </div>
+        <div class="stat-card" data-go="quotations" data-filter="month">
+          <div class="sc-title">当月报价</div>
+          <div class="sc-num"><span id="statQuotes">0</span><span class="sc-unit">份</span></div>
+          <div class="sc-sub">报价管理·本月报价单</div>
+        </div>
+        <div class="stat-card" data-go="clients">
+          <div class="sc-title">客户数量</div>
+          <div class="sc-num"><span id="statClients">0</span><span class="sc-unit">家</span></div>
+        </div>
+        <div class="stat-card" id="cardTasksToday" title="点击查看今日任务">
+          <div class="sc-title">待办任务</div>
+          <div class="sc-num"><span id="statTasksToday">0</span><span class="sc-unit">项</span></div>
+        </div>
+        <div class="stat-card" data-go="enquiry" title="进行中商机加权管道金额">
+          <div class="sc-title">加权管道</div>
+          <div class="sc-num"><span id="statWeighted">¥0</span></div>
+          <div class="sc-sub"><span id="statOpenOpp">0</span> 个进行中商机</div>
+        </div>
+        <div class="stat-card" data-go="orders" data-filter="month">
+          <div class="sc-title">本月成交</div>
+          <div class="sc-num"><span id="statMonthRevenue">¥0</span></div>
+          <div class="sc-sub">订单+成交询盘（与业绩进度一致）</div>
+        </div>
+      </div>
+
+      <div class="section-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">销售管道</div>
+              <div class="panel-meta">本月询盘按阶段分布</div>
+            </div>
+            <button class="btn btn-ghost" data-go="enquiry">查看全部</button>
+          </div>
+          <div class="panel-body no-padding">
+            <div id="pipelineList" class="pipeline-list"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">今日待办与跟进</div>
+              <div class="panel-meta">到期询盘与任务 · 逾期优先</div>
+            </div>
+            <button class="btn btn-ghost" id="dashNewTask">+ 新建任务</button>
+          </div>
+          <div class="panel-body no-padding">
+            <div id="todoList" class="todo-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-grid dashboard-opportunities">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">活跃商机</div>
+              <div class="panel-meta">近 7 天有更新</div>
+            </div>
+            <button class="btn btn-ghost" data-go="enquiry">查看全部</button>
+          </div>
+          <div class="panel-body no-padding">
+            <div id="oppList" class="opp-list"></div>
+          </div>
+        </div>
+
+
+      </div>
+
+      <div class="panel dashboard-revenue">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">收入趋势</div>
+            <div class="panel-meta">近 12 个月成交订单（折算 CNY）</div>
+          </div>
+          <button class="btn btn-ghost" data-go="orders">查看订单</button>
+        </div>
+        <div class="panel-body">
+          <div id="revenueTrend" class="revenue-trend"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 客户资料 ============ -->
+    <section id="view-clients" class="view">
+      <div class="cl-head">
+        <div class="cl-titlebox">
+          <div class="page-eyebrow">CUSTOMERS</div><h2>客户资料</h2>
+          <div class="cl-sub" id="clientMeta">共 0 个客户</div>
+        </div>
+        <div class="cl-toolbar">
+          <button id="clientImport" class="cl-btn" title="文本 / txt / CSV / Excel 批量导入">导入客户</button>
+          <button id="clientColCfg" class="cl-btn" title="显示/隐藏列、自定义表头">列设置</button>
+          <details class="cl-more"><summary class="cl-btn">更多操作 <span aria-hidden="true">⌄</span></summary><div class="cl-more-menu">
+            <button id="clientEditMode" class="cl-btn">编辑模式</button>
+            <button id="clientAiBatch" class="cl-btn">AI 批量建议</button>
+            <button id="clientAiSummary" class="cl-btn">AI 客户摘要</button>
+            <button id="clientQuickTask" class="cl-btn">一键建任务</button>
+            <button id="clientDedup" class="cl-btn">去重检查</button>
+          </div></details>
+          <button id="clientAdd" class="cl-btn cl-btn-primary">＋ 新增客户</button>
+        </div>
+      </div>
+      <div class="client-summary" aria-label="当前可见客户概览">
+        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true"><svg><use href="#ico-clients"/></svg></span><div><span>全部客户</span><strong id="csAll">0</strong></div></div>
+        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true">☆</span><div><span>星标客户</span><strong id="csStar">0</strong></div></div>
+        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true">＋</span><div><span>近 30 天新增</span><strong id="csNew">0</strong></div></div>
+        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true"><svg><use href="#ico-tasks"/></svg></span><div><span>到期 / 逾期跟进</span><strong id="csDue">0</strong></div></div>
+      </div>
+      <div class="client-scope-tabs" role="group" aria-label="客户范围">
+        <button type="button" class="active" data-client-scope="all" aria-pressed="true">全部客户</button>
+        <button type="button" data-client-scope="mine" aria-pressed="false">我的客户</button>
+        <button type="button" data-client-scope="star" aria-pressed="false">星标客户</button>
+        <button type="button" data-client-scope="due" aria-pressed="false">待跟进客户</button>
+      </div>
+
+      <div class="cl-row2">
+        <div class="cl-search">
+          <input id="clientSearch" placeholder="搜索客户 / 公司 / 国家 / 产品兴趣" />
+          <button id="clientSearchClear" class="cl-clear" title="清空">×</button>
+          <button id="clientSearchBtn" class="cl-btn cl-btn-primary cl-search-btn">搜索</button>
+        </div>
+        <div class="cl-stageline">
+          <button id="clientAiFollow" class="cl-link" title="AI 生成今日跟进优先级计划">✨ AI跟进建议</button>
+          
+        </div>
+      </div>
+
+      <div class="client-filters">
+        <label>负责人<select id="cfOwner"></select></label><label>国家<select id="cfCountry"></select></label><label>来源<select id="cfSource"></select></label>
+        <label>跟进状态<select id="cfFollow"><option value="">全部跟进</option><option value="due">到期 / 逾期</option><option value="stale">长期未跟进</option><option value="missing">未安排跟进</option></select></label>
+        <label>登记日期起<input type="date" id="cfFrom" /></label><label>登记日期止<input type="date" id="cfTo" /></label><button id="cfReset" class="cl-btn">重置筛选</button>
+      </div>
+      <details class="client-advanced"><summary>阶段与分类筛选</summary><div id="clientStageTabs" class="cl-tabs"></div>
+      <div class="cl-row3">
+        <span class="cl-catlabel">🏷 客户分类</span>
+        <div id="clientCatChips" class="cl-chips"></div>
+      </div>
+
+      </details>
+
+      <div id="clientBatchBar" class="cl-batchbar hidden">
+        <span id="clientBatchInfo" class="muted">已选 0 个客户</span>
+        <button id="clientBatchEdit" class="btn-mini" title="先勾选左侧复选框，再点此批量修改">✏️ 批量编辑</button>
+        <button id="clientBatchDelete" class="btn-mini btn-mini--danger" title="先勾选左侧复选框，再点此批量删除">🗑️ 批量删除</button>
+      </div>
+
+      <div class="panel cl-panel">
+        <div class="panel-body no-padding">
+          <div class="table-wrap">
+            <table class="data-table cl-table">
+              <thead>
+                <tr>
+                  <th class="col-checkbox" data-col="check"><input type="checkbox" id="cbClientAll" title="全选/取消全选" /></th>
+                  <th class="cl-th-star" data-col="star">星标</th>
+                  <th class="cl-th-name" data-col="name">客户名称</th>
+                  <th data-col="contact">联系人</th>
+                  <th data-col="owner">跟进人</th>
+                  <th data-col="country">国家</th>
+                  <th data-col="phase">在途询盘</th>
+                  <th data-col="grade">级别</th>
+                  <th data-col="source">来源</th>
+                  <th data-col="phone">联系方式</th>
+                  <th data-col="prod">产品兴趣</th>
+                  <th class="cl-th-comm" data-col="comm">沟通进展</th>
+                  <th data-col="health">健康度</th>
+                  <th data-col="ai">AI</th>
+                  <th data-col="created">创建时间</th>
+                  <th data-col="rel">最后跟进</th>
+                  <th class="col-actions" data-col="ops">操作</th>
+                </tr>
+              </thead>
+              <tbody id="clientBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 询盘分析（管理员） ============ -->
+    <section id="view-inqstats" class="view">
+      <div class="panel-head row">
+        <h2>询盘分析看板</h2>
+        <div class="row-right muted">按可见数据统计 · 筛选后全部图表同步</div>
+      </div>
+      <div id="isbFilters" class="orders-filter-bar">
+        <select id="isbOwnerFilter" aria-label="询盘负责人" data-no-combo></select>
+        <select id="isbYearFilter" aria-label="询盘年份" data-no-combo></select>
+        <select id="isbMonthFilter" aria-label="询盘月份" data-no-combo><option value="">全部月份</option><option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option><option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option><option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option><option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option></select>
+        <select id="isbSourceFilter" aria-label="询盘来源" data-no-combo></select>
+        <select id="isbCountryFilter" aria-label="询盘国家" data-no-combo></select>
+        <select id="isbStatusFilter" aria-label="询盘状态" data-no-combo></select>
+        <button class="btn-mini" id="isbReset" type="button">重置筛选</button>
+        <small>按收到询盘日期筛选；日期异常不计入指定年月，可在全部日期下查看。</small>
+      </div>
+      <div class="stats stats-5 isb-kpis">
+        <div class="stat-card"><div class="stat-num" id="isbMonth">0</div><div class="stat-label">筛选询盘</div><div class="stat-hint" id="isbMonthTrend">—</div></div>
+        <div class="stat-card"><div class="stat-num" id="isbPending">0</div><div class="stat-label">进行中</div><div class="stat-hint">待推进商机</div></div>
+        <div class="stat-card"><div class="stat-num" id="isbWon">0</div><div class="stat-label">成交数</div><div class="stat-hint" id="isbRate">成交率 0%</div></div>
+        <div class="stat-card"><div class="stat-num" id="isbFollow">0</div><div class="stat-label">待跟进</div><div class="stat-hint" id="isbOverdue">逾期 0 条</div></div>
+        <div class="stat-card"><div class="stat-num" id="isbTotal">0</div><div class="stat-label">异常记录</div><div class="stat-hint" id="isbLost">流失/搁置 0</div></div>
+      </div>
+      <div class="isb-grid isb-grid-top">
+        <div class="panel isb-panel"><div class="panel-head"><h2>当前阶段分布</h2><span class="muted">数量 / 占比</span></div><div id="isbFunnel" class="isb-funnel"></div></div>
+        <div class="panel isb-panel"><div class="panel-head"><h2>所选范围 · 月度分布</h2><span class="muted">询盘与成交</span></div><div id="isbTrend" class="isb-trend"></div></div>
+      </div>
+      <div class="isb-grid">
+        <div class="panel isb-panel"><div class="panel-head"><h2>来源转化效果</h2><span class="muted">按成交率排序</span></div><div id="isbSourceTable" class="isb-ranking"></div></div>
+        <div class="panel isb-panel"><div class="panel-head"><h2>业务员跟进表现</h2><span class="muted">询盘 / 成交 / 转化率</span></div><div id="isbOwnerTable" class="isb-ranking"></div></div>
+      </div>
+      <div class="isb-grid">
+        <div class="panel isb-panel"><div class="panel-head"><h2>国家 / 市场分布</h2><span class="muted">询盘数量</span></div><div id="isbCountryChart" class="chart-host"></div></div>
+        <div class="panel isb-panel"><div class="panel-head"><h2>当前状态分布</h2><span class="muted">识别卡点</span></div><div id="isbStatusChart" class="chart-host"></div></div>
+      </div>
+    <div class="panel analytics-detail"><div class="panel-head"><h2>询盘明细与跟进提醒</h2><span class="muted">逾期优先 · 点击客户查看</span></div><div id="isbDetails" class="table-wrap"></div></div></section>
+
+    <!-- ============ 报价管理 ============ -->
+    <section id="view-quotations" class="view">
+      <div class="sales-page-heading"><div><div class="page-eyebrow">QUOTATIONS</div><h2>报价管理</h2><p>管理报价、跟进客户反馈，保留每一轮修改</p></div><div class="sales-actions"><button id="qtAiAdd" class="btn-ghost">AI 识别报价单</button><button id="qtAdd" class="btn-primary">＋ 新增报价</button></div></div>
+      <div class="sales-kpis">
+        <div><span class="sales-kpi-icon">▤</span><section><span>本月报价</span><strong id="qkMonth">0</strong></section></div>
+        <div><span class="sales-kpi-icon amber">◷</span><section><span>待确认</span><strong id="qkPending">0</strong></section></div>
+        <div><span class="sales-kpi-icon green">✓</span><section><span>已接受</span><strong id="qkOrdered">0</strong></section></div>
+        <div><span class="sales-kpi-icon red">!</span><section><span>7 天内到期</span><strong id="qkAmount">0</strong></section></div>
+      </div>
+      <section class="sales-card sales-quote-list">
+        <div class="sales-tabs" id="qtStatusTabs" role="group" aria-label="报价状态"></div>
+        <div class="sales-filters"><input id="qtSearch" placeholder="搜索报价单号 / 客户 / 项目" aria-label="搜索报价" /><select id="qtStatusFilter" data-no-combo aria-label="报价状态"><option value="">全部状态</option><option>草稿</option><option>已发送</option><option>客户确认</option><option>客户拒绝</option><option>已过期</option><option>已转订单</option></select><select id="qtCurrencyFilter" data-no-combo aria-label="币种"><option value="">全部币种</option></select><label>报价日期<input id="qtDateFrom" type="date" aria-label="报价起始日期" /></label><label>至<input id="qtDateTo" type="date" aria-label="报价结束日期" /></label><button class="btn-ghost" id="qtReset">重置</button></div>
+        <div class="table-wrap"><table class="data-table sales-quote-table"><thead><tr><th data-col="quoteNo">报价单号</th><th data-col="clientName">客户</th><th data-col="amount">报价金额</th><th data-col="tradeTerms">贸易条款</th><th data-col="validUntil">有效期</th><th data-col="status">状态</th><th data-col="revision">修改轮次</th><th data-col="owner">负责人</th><th data-col="projectName">项目</th><th data-col="ops">操作</th></tr></thead><tbody id="qtBody"></tbody></table></div>
+        <div class="table-footer"><span class="muted" id="qtMeta"></span><span class="muted" id="qtFootMeta"></span><div class="pagination" id="qtPagination"></div></div>
+      </section>
+      <section id="qtSelectedDetail" aria-live="polite"></section>
+    </section>
+
+    <section id="view-order-detail" class="view"></section>
+
+    <!-- ============ 订单数据 ============ -->
+    <section id="view-orders" class="view">
+      <div class="panel-head row">
+        <h2>订单数据</h2>
+        <div class="row-right">
+          <button id="orderBatchEdit" class="btn-mini" title="先勾选左侧复选框，再点此批量修改">✏️ 批量编辑</button>
+          <button id="orderBatchDelete" class="btn-mini btn-mini--danger" title="先勾选左侧复选框，再点此批量删除">🗑️ 批量删除</button>
+          <button id="orderAiAdd" class="btn-ai" title="上传 PDF / Word / Excel，AI 自动提取订单信息">🤖 AI 录入</button>
+          <button id="orderAdd" class="btn-primary">+ 新增订单</button>
+        </div>
+      </div>
+
+      <div class="orders-filter-bar" aria-label="订单筛选">
+        <span>筛选订单</span>
+          <select aria-label="客户" id="orderClientFilter" class="mini-select" data-no-combo title="按客户筛选"><option value="">全部客户</option></select>
+          <select aria-label="负责人" id="orderOwnerFilter" class="mini-select" data-no-combo title="按负责人筛选"><option value="">全部负责人</option></select>
+          <select aria-label="订单状态" id="orderStatusFilter" class="mini-select" data-no-combo>
+            <option value="">全部状态</option>
+            <option value="待确认">待确认</option>
+            <option value="已确认">已确认</option>
+            <option value="生产中">生产中</option>
+            <option value="已发货">已发货</option>
+            <option value="已收款">已收款</option>
+            <option value="已完成">已完成</option>
+            <option value="已取消">已取消</option>
+          </select>
+        <select id="orderYearFilter" class="mini-select" data-no-combo aria-label="下单年份"><option value="">全部年份</option></select>
+        <select id="orderMonthFilter" class="mini-select" data-no-combo aria-label="下单月份"><option value="">全部月份</option><option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option><option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option><option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option><option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option></select>
+        <button id="orderFilterReset" class="btn-mini" type="button">重置筛选</button>
+        <small>按下单日期筛选 · 下方统计与列表同步</small>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card sc-today">
+          <div class="sc-title">筛选订单数</div>
+          <div class="sc-num"><span id="okTotal">0</span><span class="sc-unit">笔</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-title">待确认</div>
+          <div class="sc-num"><span id="okPending">0</span><span class="sc-unit">笔</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-title">已发货</div>
+          <div class="sc-num"><span id="okShipped">0</span><span class="sc-unit">笔</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-title">待收款</div>
+          <div class="sc-num"><span id="okAmount">¥0</span></div>
+        </div>
+        <div class="stat-card" title="当前筛选结果中，已收款及已完成订单金额，折合 CNY"><div class="sc-title">已收款</div><div class="sc-num"><span id="okPaidAmount">¥0</span></div></div>
+        <div class="stat-card" title="当前筛选结果中，未取消订单的总金额，折合 CNY"><div class="sc-title">筛选订单金额</div><div class="sc-num"><span id="okMonthAmount">¥0</span></div></div>
+
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">订单列表</div>
+            <div class="panel-meta" id="orderMeta">加载中…</div>
+          </div>
+          <div class="panel-tools">
+            <button class="btn btn-ghost" id="orderColumns" type="button">⚙ 列管理</button>
+            <button class="btn btn-ghost btn-icon" title="导出" id="orderExport">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="panel-body no-padding">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th data-col="c0" style="width:36px;"><input type="checkbox" id="cbOrderAll" title="全选/取消"></th>
+                  <th data-col="c1" style="width:120px;">订单号</th>
+                  <th data-col="c2">客户</th>
+                  <th data-col="owner" style="width:110px;">负责人</th>
+                  <th data-col="c3" style="width:100px;">国家</th>
+                  <th data-col="c4" style="width:120px;" class="text-right">金额</th>
+                  <th data-col="c5" style="width:130px;" class="text-right">折合 CNY</th>
+                  <th data-col="c6" style="width:100px;">状态</th>
+                  <th data-col="c7" style="width:110px;">下单日期</th>
+                  <th data-col="c8" style="width:110px;">交期</th>
+                  <th data-col="c9" style="width:100px;" class="text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody id="orderBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 客户 360° 详情 ============ -->
+    <section id="view-client-detail" class="view">
+      <div class="detail-page">
+        <button class="btn btn-ghost back-btn" id="cdBack">← 返回客户列表</button>
+        <div class="detail-grid">
+          <div class="profile-panel" id="cdProfile"></div>
+          <div class="detail-panel">
+            <div class="detail-body" id="cdBody"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 询盘管理 ============ -->
+    <section id="view-enquiry" class="view">
+      <div class="panel-head row">
+        <h2>询盘管理</h2>
+        <div class="row-right">
+          <input id="inqSearch" class="search" placeholder="搜索公司/产品/国家" />
+          <button id="aiRegisterBtn" class="btn-ai" title="粘贴邮件/聊天记录，AI 自动提取并登记">🤖 AI 智能登记</button>
+          <button id="aiSettingsBtn2" class="btn-mini" title="AI 接口设置">⚙ AI</button>
+          <button id="inqBatchEdit" class="btn-mini" title="先勾选左侧复选框，再点此批量修改">✏️ 批量编辑</button>
+          <button id="inqBatchDelete" class="btn-mini btn-mini--danger" title="先勾选左侧复选框，再点此批量删除">🗑️ 批量删除</button>
+          <button id="inqAdd" class="btn-primary" title="粘贴询盘原文 → AI 自动填表 → 核 3 项即可保存">+ 新增询盘（粘贴即填）</button>
+        </div>
+      </div>
+
+      <!-- 子页签 -->
+      <div class="subtabs">
+        <button class="subtab active" data-subtab="board">看板</button>
+        <button class="subtab" data-subtab="list">清单</button>
+        <button class="subtab" data-subtab="stats">统计分析</button>
+        <button class="subtab" data-subtab="exception">异常登记</button>
+      </div>
+
+      <!-- 看板 -->
+      <div id="sub-board" class="subview active">
+        <div id="inqBoard" class="kanban"></div>
+      </div>
+
+      <!-- 清单 -->
+      <div id="sub-list" class="subview">
+        <!-- 分级筛选条已移除：分类统一用 status -->
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:32px"><input type="checkbox" id="cbInqAll" title="全选/取消全选" /></th><th>客户</th><th>国家</th><th>产品</th>
+                <th>来源</th><th>状态</th><th>预计金额</th>
+                <th>下次跟进</th><th>责任人</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="inqListBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 统计分析 -->
+      <div id="sub-stats" class="subview">
+        
+      <div class="stats stats-4">
+          <div class="stat-card"><div class="stat-num" id="istInq">0</div><div class="stat-label">询盘总数</div></div>
+          <div class="stat-card"><div class="stat-num" id="istConv">0%</div><div class="stat-label">成交率</div></div>
+          <div class="stat-card"><div class="stat-num" id="istSample">0</div><div class="stat-label">寄样客户数</div></div>
+          <div class="stat-card"><div class="stat-num" id="istGarbage">0</div><div class="stat-label">无效询盘</div></div>
+        </div>
+        <div class="dash-grid">
+          <div class="panel">
+            <div class="panel-head"><h2>按状态分布</h2></div>
+            <div id="istLevelChart" class="chart-host"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>按来源分布</h2></div>
+            <div id="istSourceChart" class="chart-host"></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-head"><h2>按国家分布</h2></div>
+          <div id="istCountryChart" class="chart-host"></div>
+        </div>
+      </div>
+
+      <!-- 异常登记 -->
+      <div id="sub-exception" class="subview">
+        <div class="panel-head row">
+          <h2 style="font-size:15px">询盘异常问题</h2>
+          <div class="row-right">
+            <button id="excAdd" class="btn-primary">+ 新增异常</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>登记日期</th><th>关联询盘</th><th>类型</th><th>描述</th>
+                <th>状态</th><th>负责人</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="excBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 业绩进度 ============ -->
+    <section id="view-performance" class="view">
+      <div class="panel-head row">
+        <h2>业绩进度</h2>
+        <div class="row-right">
+          <div class="seg">
+            <button class="seg-btn active" data-period="month">月度</button>
+            <button class="seg-btn" data-period="quarter">季度</button>
+            <button class="seg-btn" data-period="year">年度</button>
+          </div>
+          <button id="perfEditTarget" class="btn-mini">⚙ 设置目标</button>
+        </div>
+      </div>
+
+      <div class="orders-filter-bar"><label>基准月份 <input id="perfDate" type="month" /></label><label>目标视角 <select id="perfOwner" data-no-combo></select></label><label>大单门槛（CNY） <input id="perfLarge" type="number" min="1" value="100000" /></label></div>
+      <p id="perfBudget" class="muted" style="line-height:1.8"></p>
+      <div class="stats stats-4">
+        <div class="stat-card"><div class="stat-num" id="pfTarget">¥0</div><div class="stat-label">目标金额</div></div>
+        <div class="stat-card"><div class="stat-num" id="pfActual">¥0</div><div class="stat-label">订单金额</div></div>
+        <div class="stat-card"><div class="stat-num" id="pfRate">0%</div><div class="stat-label">完成率</div></div>
+        <div class="stat-card"><div class="stat-num" id="pfDelta">¥0</div><div class="stat-label">距目标差额</div></div>
+      </div>
+      <div id="pfBreakdown" class="muted" style="margin:-8px 2px 14px;font-size:12px"></div>
+
+      <div class="perf-chart-grid">
+        <div class="panel">
+          <div class="panel-head"><h2>目标完成进度</h2></div>
+          <div id="pfRing" class="ring-host"></div>
+          <div id="pfRingLabel" class="ring-label"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>所选年度 · 每月实绩 / 目标</h2></div>
+          <div id="pfMonthlyChart" class="chart-host"></div>
+        </div>
+      </div>
+
+      <div class="perf-chart-grid perf-trend-row"><div class="panel"><div class="panel-head"><h2>所选年度 · 累计实绩趋势</h2></div><div id="pfCumulative" class="chart-host"></div></div><div class="panel"><div class="panel-head"><h2>周期内订单 · 状态分布</h2></div><div id="pfStatus" class="chart-host"></div></div></div>
+      <div class="perf-chart-grid perf-distribution-row">
+        <div class="panel">
+          <div class="panel-head"><h2>客户金额分布 Top 10</h2></div>
+          <div id="pfClientChart" class="chart-host"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>周期内收到的询盘 · 当前状态</h2></div>
+          <div id="pfFunnel" class="funnel-host"></div>
+        </div>
+      </div>
+    <div class="panel analytics-detail"><div class="panel-head"><h2>订单明细 · 大单与异常</h2><span id="pfAlertSummary" class="muted"></span></div><div id="pfDeals" class="table-wrap"></div></div></section>
+
+    <!-- ============ 计算器 ============ -->
+    <section id="view-calc" class="view">
+      <div class="calc-heading">
+        <div><h2>计算器</h2><p>日常运算、货物体积与装柜估算</p></div>
+      </div>
+      <div class="calc-tabs" role="tablist" aria-label="计算器类型">
+        <button class="seg-btn active" role="tab" aria-selected="true" aria-controls="calc-normal" data-calctab="normal">普通计算</button>
+        <button class="seg-btn" role="tab" aria-selected="false" aria-controls="calc-cbm" data-calctab="cbm">CBM 体积</button>
+        <button class="seg-btn" role="tab" aria-selected="false" aria-controls="calc-container" data-calctab="container">装柜估算</button>
+      </div>
+
+      <!-- 普通计算 -->
+      <div id="calc-normal" class="calc-tab active" role="tabpanel">
+        <div class="calc-workspace">
+          <div class="calc-card calc-keypad-card">
+            <div class="calc-screen">
+              <div class="calc-screen-label">计算式 <span id="calcStatus">可用键盘输入</span></div>
+              <input id="calcDisplay" class="calc-display" value="0" aria-label="当前计算式" readonly />
+              <div class="calc-preview" id="calcPreview" aria-live="polite">结果 0</div>
+            </div>
+            <div class="calc-keys">
+              <button class="ck gray" data-k="C" aria-label="清空">AC</button>
+              <button class="ck gray" data-k="±" aria-label="切换正负">±</button>
+              <button class="ck gray" data-k="%" aria-label="百分比" title="加减时按前面金额的百分比计算">%</button>
+              <button class="ck op" data-k="/" aria-label="除">÷</button>
+              <button class="ck" data-k="7">7</button><button class="ck" data-k="8">8</button><button class="ck" data-k="9">9</button><button class="ck op" data-k="*" aria-label="乘">×</button>
+              <button class="ck" data-k="4">4</button><button class="ck" data-k="5">5</button><button class="ck" data-k="6">6</button><button class="ck op" data-k="-" aria-label="减">−</button>
+              <button class="ck" data-k="1">1</button><button class="ck" data-k="2">2</button><button class="ck" data-k="3">3</button><button class="ck op" data-k="+" aria-label="加">+</button>
+              <button class="ck" data-k="0">0</button><button class="ck" data-k=".">.</button><button class="ck gray" data-k="back" aria-label="退格">⌫</button><button class="ck eq" data-k="=" aria-label="等于">=</button>
+            </div>
+            <div class="calc-actions"><span>Enter 计算 · Backspace 退格 · Esc 清空</span><button class="btn-mini" id="calcCopy">复制结果</button></div>
+          </div>
+          <div class="calc-card calc-history-card">
+            <div class="calc-card-top"><div><h3>最近计算</h3><p>点击结果可继续计算</p></div><button class="btn-mini" id="calcHistoryClear">清空记录</button></div>
+            <div id="calcHistory" class="calc-history" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CBM 体积 -->
+      <div id="calc-cbm" class="calc-tab" role="tabpanel" hidden>
+        <div class="calc-grid2">
+          <div class="calc-card">
+            <div class="calc-card-top"><div><h3>货物尺寸</h3><p>按外包装尺寸填写，每件长 × 宽 × 高</p></div></div>
+            <div class="calc-fields">
+              <div class="field"><label for="cbmL">长 <small>cm</small></label><input id="cbmL" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 120" /></div>
+              <div class="field"><label for="cbmW">宽 <small>cm</small></label><input id="cbmW" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 100" /></div>
+              <div class="field"><label for="cbmH">高 <small>cm</small></label><input id="cbmH" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 90" /></div>
+              <div class="field"><label for="cbmQty">件数 <small>件</small></label><input id="cbmQty" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 10" /></div>
+              <div class="field"><label for="cbmWt">单件毛重 <small>kg · 可选</small></label><input id="cbmWt" type="number" min="0" step="any" inputmode="decimal" placeholder="可留空" /></div>
+            </div>
+            <div class="calc-form-actions"><button class="btn-mini" id="cbmReset">清空</button><button class="btn-primary" id="cbmCalc">计算体积</button></div>
+          </div>
+          <div class="calc-card">
+            <div class="calc-card-top"><div><h3>计算结果</h3><p>填写尺寸后自动更新</p></div><button class="btn-mini" id="cbmCopy" disabled>复制结果</button></div>
+            <div id="cbmResult" class="calc-result" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 装柜计算 -->
+      <div id="calc-container" class="calc-tab" role="tabpanel" hidden>
+        <div class="calc-grid2">
+          <div class="calc-card">
+            <div class="calc-card-top"><div><h3>集装箱与货物</h3><p>选择箱型后可按实际内尺寸修改</p></div></div>
+            <div class="field"><label for="ctType">箱型</label>
+              <select id="ctType" data-no-combo>
+                <option value="20GP">20GP（小柜）</option>
+                <option value="40GP">40GP（平柜）</option>
+                <option value="40HQ" selected>40HQ（高柜）</option>
+                <option value="45HQ">45HQ（超高柜）</option>
+                <option value="custom">自定义</option>
+              </select>
+            </div>
+            <div class="calc-fields">
+              <div class="field"><label for="ctL">内长 <small>m</small></label><input id="ctL" type="number" min="0" step="any" inputmode="decimal" value="12.03" /></div>
+              <div class="field"><label for="ctW">内宽 <small>m</small></label><input id="ctW" type="number" min="0" step="any" inputmode="decimal" value="2.35" /></div>
+              <div class="field"><label for="ctH">内高 <small>m</small></label><input id="ctH" type="number" min="0" step="any" inputmode="decimal" value="2.69" /></div>
+              <div class="field"><label for="ctLoad">最大载重 <small>kg</small></label><input id="ctLoad" type="number" min="0" step="any" inputmode="decimal" value="26500" /></div>
+            </div>
+            <div class="calc-field-divider">货物数据</div>
+            <div class="field"><label for="ctMode">统计方式</label>
+              <select id="ctMode" data-no-combo>
+                <option value="cbm">按总体积 CBM</option>
+                <option value="carton">按箱数与箱规</option>
+              </select>
+            </div>
+            <div id="ctCbmWrap" class="calc-fields">
+              <div class="field"><label for="ctCBM">总体积 <small>m³</small></label><input id="ctCBM" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 30" /></div>
+              <div class="field"><label for="ctWeight">总毛重 <small>kg · 可选</small></label><input id="ctWeight" type="number" min="0" step="any" inputmode="decimal" placeholder="可留空" /></div>
+            </div>
+            <div id="ctCartonWrap" class="calc-fields" hidden>
+              <div class="field"><label for="ctcL">箱长 <small>cm</small></label><input id="ctcL" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 60" /></div>
+              <div class="field"><label for="ctcW">箱宽 <small>cm</small></label><input id="ctcW" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 50" /></div>
+              <div class="field"><label for="ctcH">箱高 <small>cm</small></label><input id="ctcH" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 40" /></div>
+              <div class="field"><label for="ctcN">箱数 <small>箱</small></label><input id="ctcN" type="number" min="1" step="1" inputmode="numeric" placeholder="例如 200" /></div>
+              <div class="field"><label for="ctcWt">单箱毛重 <small>kg · 可选</small></label><input id="ctcWt" type="number" min="0" step="any" inputmode="decimal" placeholder="可留空" /></div>
+            </div>
+            <div class="calc-form-actions"><button class="btn-mini" id="ctReset">清空货物</button><button class="btn-primary" id="ctCalc">估算装柜</button></div>
+          </div>
+          <div class="calc-card">
+            <div class="calc-card-top"><div><h3>装柜结果</h3><p>填写货物数据后自动更新</p></div><button class="btn-mini" id="ctCopy" disabled>复制结果</button></div>
+            <div id="ctResult" class="calc-result" aria-live="polite"></div>
+            <div id="ctRef" class="calc-ref"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 单证生成 ============ -->
+    <section id="view-docs" class="view">
+      <div class="docs-layout">
+        <div class="docs-form panel">
+          <h2>单证生成</h2>
+          <div class="doc-types">
+            <button class="doc-type active" data-doctype="quotation">报价单</button>
+            <button class="doc-type" data-doctype="pi">形式发票</button>
+            <button class="doc-type" data-doctype="contract">销售合同</button>
+            <button class="doc-type" data-doctype="ci">商业发票</button>
+            <button class="doc-type" data-doctype="packing">装箱单</button>
+          </div>
+
+          <div class="doc-settings">
+            <div class="field"><label>语言</label>
+              <select id="d_lang">
+                <option value="en">英文 English</option>
+                <option value="cn">中文</option>
+                <option value="bi">中英双语</option>
+              </select>
+            </div>
+            <div class="field"><label>公司Logo</label>
+              <input type="file" id="d_logo" accept="image/*" />
+              <img id="d_logo_preview" class="logo-prev hidden" alt="logo" />
+            </div>
+            <div class="field check"><label><input type="checkbox" id="d_showTotal" checked /> 显示总额与汇率换算</label></div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field"><label>单号（手动填写）</label><input id="d_docNo" aria-describedby="d_docNoHint" /><small id="d_docNoHint" class="muted"></small></div>
+            <div class="field"><label>日期</label><input id="d_date" type="date" /></div>
+            <div class="field"><label>币种</label><select id="d_currency"></select></div>
+            <div class="field"><label>汇率(→CNY，可改)</label><input id="d_rate" type="number" step="0.0001" /></div>
+            <div class="field"><label>贸易术语</label><input id="d_tradeTerm" placeholder="FOB Shenzhen" /></div>
+            <div class="field"><label>付款方式</label><input id="d_payment" placeholder="T/T 50% deposit" /></div>
+            <div class="field"><label>交货期</label><input id="d_delivery" placeholder="35 working days" /></div>
+
+            <div class="field full"><label>唛头 / Marks（PI/CI/装箱单用）</label>
+              <textarea id="d_marks" rows="2" placeholder="买方名称 / MADE IN CHINA"></textarea>
+            </div>
+          </div>
+
+          <div class="party-block">
+            <div class="party-title">卖方 (Seller)</div>
+            <div class="form-grid">
+              <div class="field full"><label>公司名称</label><input id="s_name" /></div>
+              <div class="field full"><label>地址</label><input id="s_addr" /></div>
+              <div class="field"><label>联系人</label><input id="s_contact" /></div>
+              <div class="field"><label>邮箱</label><input id="s_email" /></div>
+              <div class="field"><label>电话</label><input id="s_tel" /></div>
+              <div class="field full"><label>收款账户</label><div class="doc-bank-picker"><select id="d_bank"><option value="">当前单证 / 手动填写</option></select><button type="button" class="btn-mini" id="d_bankNew">新增账户</button><button type="button" class="btn-mini" id="d_bankEdit">编辑账户</button></div><small id="d_bankStatus" class="muted">账户保存到 NAS，供单证重复选用。</small></div><div class="field full"><label>本单收款信息</label><textarea id="s_bank" rows="5" placeholder="收款人 / 银行 / 账号 / SWIFT / 银行地址"></textarea></div>
+            </div>
+          </div>
+
+            <div class="party-block">
+            <div class="party-title">买方 (Buyer)</div><div class="field full"><label>选择客户（输入名称搜索）</label><select id="d_client"><option value="">— 手动输入 —</option></select><small class="muted">选择后带入客户档案，本单修改不影响原档案。</small></div>
+            <div class="form-grid">
+              <div class="field full"><label>公司名称</label><input id="b_name" /></div>
+              <div class="field"><label>国家</label><input id="b_country" /></div>
+              <div class="field full"><label>地址</label><input id="b_addr" /></div>
+              <div class="field"><label>联系人</label><input id="b_contact" /></div>
+              <div class="field"><label>邮箱</label><input id="b_email" /></div>
+              <div class="field"><label>电话</label><input id="b_tel" /></div>
+              <div class="field"><label>NIF 号</label><input id="b_nif" /></div>
+              <div class="field"><label>信用证号 L/C</label><input id="b_lc" /></div>
+            </div>
+          </div>
+
+          <div class="items-head">
+            <span>明细</span>
+            <button id="d_addItem" class="btn-mini">+ 添加行</button>
+          </div>
+          <div id="d_items"></div>
+
+          <div class="field full" style="margin-top:12px">
+            <label>备注 / 条款 Terms</label>
+            <textarea id="d_notes" rows="4" placeholder="1. ...&#10;2. ..."></textarea>
+          </div>
+          <div class="field full" id="d_afterSales_wrap" style="margin-top:6px">
+            <label>售后条款 After-sales（PI 必填）</label>
+            <textarea id="d_afterSales" rows="3" placeholder="1. ...&#10;2. ..."></textarea>
+          </div>
+        </div>
+
+        <div class="docs-preview panel">
+          <div class="panel-head">
+            <h2>预览</h2>
+            <div class="panel-actions">
+              <button id="d_print" class="btn-primary">🖨 打印 / 保存 PDF</button>
+            </div>
+          </div>
+          <div id="d_preview" class="doc-preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 开发信草稿 ============ -->
+    <section id="view-emails" class="view">
+      <div class="panel-head row">
+        <h2>开发信草稿</h2>
+        <div class="row-right">
+          <input id="emailSearch" class="search" placeholder="搜索标题 / 内容 / 标签" />
+          <button id="emailAdd" class="btn-primary">+ 新建草稿</button>
+        </div>
+      </div>
+      <div id="emailList" class="email-list"></div>
+    </section>
+
+    <!-- ============ 产品内容库 ============ -->
+    <section id="view-products" class="view">
+      <div class="panel-head row">
+        <h2>产品内容库</h2>
+        <div class="row-right">
+          <input id="productSearch" class="search" placeholder="搜索名称 / 型号 / 类目" />
+          <button id="productAdd" class="btn-primary">+ 新增产品</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>名称</th><th>型号</th><th>类目</th><th>描述</th><th>参考价</th><th>操作</th></tr>
+          </thead>
+          <tbody id="productBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 出货 / 物流 ============ -->
+    <section id="view-shipments" class="view">
+      <div class="panel-head row">
+        <h2>出货 / 物流</h2>
+        <div class="row-right"><button id="shipAdd" class="btn-primary">+ 新增出货</button></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>出货单号</th><th>客户</th><th>关联订单</th><th>订单状态</th><th>出货状态</th><th>承运</th><th>运单号</th><th>ETA</th><th>目的港</th><th>操作</th></tr></thead>
+          <tbody id="shipBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 供应商 ============ -->
+    <section id="view-suppliers" class="view">
+      <div class="panel-head row">
+        <h2>供应商</h2>
+        <div class="row-right"><button id="suppAdd" class="btn-primary">+ 新增供应商</button></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>名称</th><th>类别</th><th>联系人</th><th>电话</th><th>邮箱</th><th>供应产品</th><th>资料附件夹</th><th>操作</th></tr></thead>
+          <tbody id="suppBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 财务 ============ -->
+    <section id="view-finance" class="view">
+      <div class="panel-head row">
+        <h2>财务汇总（应收 / 应付）</h2>
+        <div class="row-right"><button id="finAdd" class="btn-primary">+ 新增记录</button></div>
+      </div>
+      <div class="stats stats-4" id="finSummary"></div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-head"><div class="card-title">客户应收未收（折算 CNY）</div></div>
+        <div id="finByClient" class="chart-host"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table class="data-table">
+          <thead><tr><th>类型</th><th>客户</th><th>订单号</th><th>金额</th><th>折合CNY</th><th>状态</th><th>日期</th><th>操作</th></tr></thead>
+          <tbody id="finBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 沟通工作台（三合一：会话时间线 / 沟通记录 / 聊天记录 / 邮件中心）============ -->
+    <section id="view-comms" class="view">
+      <div class="panel-head row">
+        <h2>沟通工作台（一个入口管所有客户沟通）</h2>
+        <div class="row-right">
+          <button id="commAiDec" class="btn-ai" title="粘贴聊天记录，AI 自动解构并更新客户/商机/任务/沟通/订单（少录入）">🤖 AI 解构</button>
+          <button id="commWa" class="btn-mini" title="选客户 → 套话术 → 打开 WhatsApp 并自动存档">🟢 发起 WhatsApp</button>
+          <button id="commImport" class="btn-mini" title="文本 / txt / CSV / Excel 批量导入">📥 导入</button>
+          <button id="commAdd" class="btn-primary">+ 沟通</button>
+          <button id="commTmplAdd" class="btn-mini">+ 话术</button>
+        </div>
+      </div>
+      <div class="subtabs">
+        <button class="subtab active" data-ctab="timeline">🕐 会话时间线</button>
+        <button class="subtab" data-ctab="records">📋 沟通记录</button>
+        <button class="subtab" data-ctab="templates">💬 快捷话术</button>
+        <button class="subtab" data-ctab="chatlog">💭 聊天记录</button>
+        <button class="subtab" data-ctab="mail">📧 邮件中心</button>
+      </div>
+      <div id="sub-timeline" class="subview active">
+        <div class="level-filter" id="timelineFilter">
+          <button class="lf-chip active" data-tl="">全部客户</button>
+          <button class="lf-chip" data-tl="今天">今天</button>
+          <button class="lf-chip" data-tl="近7天">近 7 天</button>
+          <button class="lf-chip" data-tl="近30天">近 30 天</button>
+        </div>
+        <div id="timelineList" class="email-list"></div>
+      </div>
+      <div id="sub-records" class="subview">
+        <div class="level-filter" id="commChannelChips">
+          <button class="lf-chip active" data-ch="">全部</button>
+          <button class="lf-chip" data-ch="微信">💬 微信</button>
+          <button class="lf-chip" data-ch="WhatsApp">🟢 WhatsApp</button>
+          <button class="lf-chip" data-ch="电话">📞 电话</button>
+          <button class="lf-chip" data-ch="邮件">📧 邮件</button>
+          <button class="lf-chip" data-ch="其他">📝 其他</button>
+        </div>
+        <div id="commList" class="email-list"></div>
+      </div>
+      <div id="sub-templates" class="subview">
+        <div id="commTmplList" class="email-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ 聊天记录（整段导入 → 行级标注 → AI 接待建议）============ -->
+    <section id="view-chatlog" class="view">
+      <div class="panel-head row">
+        <h2>聊天记录（整段导入，进入后逐行标注）</h2>
+        <div class="row-right">
+          <button id="chatImport" class="btn-primary" onclick="openUnifiedImport('chat')">📥 导入聊天记录</button>
+        </div>
+      </div>
+      <div id="chatLogList" class="email-list"></div>
+    </section>
+
+    <!-- ============ 邮件中心 ============ -->
+    <section id="view-mail" class="view">
+      <div class="panel-head row">
+        <h2>邮件中心</h2>
+        <div class="row-right">
+          <button id="mailTabInbox" class="subt active">📥 收件箱</button>
+          <button id="mailTabSent" class="subt">📤 已发送</button>
+          <button id="mailTabCompose" class="subt">✏️ 撰写</button>
+        </div>
+      </div>
+      <div id="mailInbox" class="subview">
+        <div id="mailInboxList" class="mail-list"><div class="empty">加载中…</div></div>
+        <div id="mailDetail" class="mail-detail hidden">
+          <div id="mailDetailHead"></div>
+          <div id="mailDetailBody"></div>
+          <div class="mail-actions"><button class="btn-mini" id="mailReply">↩ 回复</button><button class="btn-ghost" id="mailDetailBack">← 返回列表</button></div>
+        </div>
+      </div>
+      <div id="mailSent" class="subview hidden">
+        <div id="mailSentList" class="mail-list"><div class="empty">加载中…</div></div>
+      </div>
+      <div id="mailCompose" class="subview hidden">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 20px">
+          <div class="field"><label>收件人 *</label><input id="mailTo" placeholder="多个用逗号分隔" /></div>
+          <div class="field"><label>抄送</label><input id="mailCc" /></div>
+          <div class="field full"><label>主题</label><input id="mailSubject" /></div>
+          <div class="field full"><label>模板</label><select id="mailTmpl"></select></div>
+          <div class="field full"><label>正文</label><textarea id="mailBody" rows="12"></textarea></div>
+        </div>
+        <div style="padding:0 20px;margin-top:14px"><button id="mailSendBtn" class="btn-primary">📤 发送</button> <span id="mailResult" style="margin-left:10px;font-size:13px"></span></div>
+      </div>
+    </section>
+
+    <!-- ============ 任务与日历 ============ -->
+    <section id="view-tasks" class="view">
+      <div class="panel-head row">
+        <h2>任务与日历</h2>
+        <div class="row-right">
+          <select id="taskTypeFilter" class="mini-select">
+            <option value="">全部类型</option>
+            <option value="待办">待办</option>
+            <option value="电话">电话</option>
+            <option value="会议">会议</option>
+            <option value="邮件">邮件</option>
+            <option value="其他">其他</option>
+          </select>
+          <label class="chk-inline"><input type="checkbox" id="taskMineOnly" checked /> 仅我看</label>
+          <button id="taskAdd" class="btn-primary">+ 新建任务</button>
+        </div>
+      </div>
+      <div class="subtabs">
+        <button class="subtab active" data-subtab="list">列表</button>
+        <button class="subtab" data-subtab="kanban">看板</button>
+        <button class="subtab" data-subtab="calendar">日历</button>
+      </div>
+      <div id="sub-task-list" class="subview active">
+        <div class="level-filter" id="taskFilterBar">
+          <button class="lf-chip active" data-st="open">待办</button>
+          <button class="lf-chip" data-st="overdue">逾期</button>
+          <button class="lf-chip" data-st="done">已完成</button>
+          <button class="lf-chip" data-st="all">全部</button>
+        </div>
+        <div id="taskListBody" class="task-list"></div>
+      </div>
+      <div id="sub-task-cal" class="subview">
+        <div class="cal-bar">
+          <button class="btn-mini" id="calPrev">◀</button>
+          <span id="calTitle" class="cal-title"></span>
+          <button class="btn-mini" id="calNext">▶</button>
+          <button class="btn-mini" id="calToday">今天</button>
+        </div>
+        <div id="taskCalHost" class="cal-host"></div>
+      </div>
+      <div id="sub-task-kanban" class="subview">
+        <div id="taskKanbanHost" class="kb-host"></div>
+      </div>
+    </section>
+
+    <!-- ============ 报表导出 ============ -->
+    <section id="view-reports" class="view">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><span class="en">REPORTS</span><span class="cn">自定义报表 / Excel 导出</span></div>
+          <button class="btn-mini" id="repExport">⬇️ 导出 Excel</button>
+        </div>
+        <div class="rep-bar">
+          <label>数据实体
+            <select id="repEntity">
+              <option value="clients">客户</option>
+              <option value="orders">订单 / 商机</option>
+              <option value="inquiries">询盘</option>
+              <option value="contacts">联系人</option>
+            </select>
+          </label>
+          <label>筛选（关键字，选填）<input id="repFilter" placeholder="如客户名 / 订单号 / 国家" /></label>
+          <button class="btn-mini" id="repLoad">查询</button>
+          <span class="muted" id="repCount"></span>
+        </div>
+        <div id="repFields" class="rep-fields"></div>
+        <div id="repTableHost" class="rep-table-host"></div>
+      </div>
+    </section>
+
+    <!-- ============ 设置 ============ -->
+    <section id="view-settings" class="view"></section>
+
+    <!-- ============ 操作日志（仅管理员） ============ -->
+    <section id="view-audit" class="view"></section>
+
+    <!-- ============ 提醒中心 ============ -->
+    <section id="view-reminders" class="view"></section>
+
+    <!-- ============ 资料 / 知识库 ============ -->
+    <section id="view-knowledge" class="view"></section>
+
+
+  </main>
+  </div>
+  </div>
+
+  <!-- 客户/订单编辑弹窗 -->
+  <div id="modal" class="modal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="modalTitle">编辑</h3>
+        <button id="modalClose" class="x">×</button>
+      </div>
+      <form id="modalForm" class="modal-form"></form>
+      <div class="modal-footbar" id="modalFoot"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 独立的空闲提醒，不复用编辑弹窗，保留正在填写的内容 -->
+  <span id="idleRefreshAnnouncement" class="idle-refresh-live" role="status" aria-live="polite" aria-atomic="true"></span>
+  <aside id="idleRefreshReminder" class="idle-refresh-reminder" hidden aria-labelledby="idleRefreshTitle">
+    <div>
+      <h3 id="idleRefreshTitle">页面已超过 30 分钟无操作</h3>
+      <p>数据可能已有更新，建议刷新页面后继续使用。</p>
+      <p class="idle-refresh-note">不会自动刷新。若有未保存的内容，请先选择“暂不刷新”，保存后再刷新。</p>
+    </div>
+    <div class="idle-refresh-actions">
+      <button type="button" id="idleRefreshLater" class="btn-ghost">暂不刷新</button>
+      <button type="button" id="idleRefreshNow" class="btn-primary">立即刷新</button>
+    </div>
+  </aside>
+
+  <!-- 登录遮罩 -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+      <div class="login-logo">🌐</div>
+      <div class="login-title">外贸CRM系统</div>
+      <div class="login-sub">登录以管理你的客户、商机、订单与业绩</div>
+      <form id="loginForm" class="login-form">
+        <input id="loginUser" class="login-input" placeholder="用户名" autocomplete="username" />
+        <input id="loginPwd" class="login-input" type="password" placeholder="密码" autocomplete="current-password" />
+        <button type="submit" class="login-btn">登 录</button>
+        <div id="loginErr" class="login-err"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 客户速览侧板（参考 ai-crm-vibe 原型：客户列表右侧滑出详情） -->
+  <div id="clientDrawerMask" class="cDrawer-mask"></div>
+  <aside id="clientDrawer" class="cDrawer" role="dialog" aria-modal="true" aria-label="客户速览" aria-hidden="true" inert>
+    <div class="cDrawer-head">
+      <span class="cDrawer-title">客户速览</span>
+      <button class="cDrawer-close" id="clientDrawerClose" title="关闭（Esc）">×</button>
+    </div>
+    <div class="cDrawer-body" id="clientDrawerBody"></div>
+  </aside>
+
+  <script src="app.js?v=20260930quote2"></script>
+  <script src="sales-detail.js?v=20260929sales1"></script>
+  <script src="docs.js?v=20260929sales1"></script>
+  <script src="quotations.js?v=20260930pdf3"></script>
+  <script src="inquiry.js?v=20260921c"></script>
+  <script src="emails.js?v=20260914sort"></script>
+  <script src="products.js?v=20260914sort"></script>
+  <script src="ops.js?v=20260929sales1"></script>
+  <script src="comms.js?v=20260914sort"></script>
+  <script src="mail.js?v=20260929refine1"></script>
+  <script src="performance-viz.js?v=20260929refine1"></script>
+  <script src="performance.js?v=20260929refine1"></script>
+  <script src="ai.js?v=20260930pdf3"></script>
+  <script src="calc.js?v=20260923b"></script>
+  <script src="settings.js?v=20260929refine1"></script>
+  <script src="audit.js?v=20260810a"></script>
+  <script src="tasks.js?v=20260914sort"></script>
+  <script src="contacts.js?v=20260810g"></script>
+  <script src="reports.js?v=20260810g"></script>
+  <script src="inqstats.js?v=20260928analytics1"></script>
+  <script src="chatlog.js?v=20260914sort"></script>
+  <script src="wa.js?v=20260914b"></script>
+  <script src="reminders.js?v=20260921d"></script>
+  <script src="knowledge.js?v=20260921c"></script>
+  <script src="crm-import.js?v=20260827c"></script>
+  <script src="combo.js?v=20260929interaction1"></script>
+  <script src="ui-layout.js?v=20260929blue1"></script>
+  <script src="data-status.js?v=20260914a"></script>
+  <script src="idle-refresh.js?v=20260921a"></script>
+  <script src="update-notice.js?v=20260921d"></script>
+</body>
+</html>

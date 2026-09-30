@@ -1,0 +1,29 @@
+{
+  "name": "foreign-trade-workbench",
+  "version": "1.0.0",
+  "description": "Self-hosted foreign trade CRM with quotations, orders, customer management and optional AI document intake.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "migrate": "node db/migrate.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "mammoth": "^1.12.3",
+    "mysql2": "^3.23.4",
+    "pdf-parse": "^2.4.5",
+    "xlsx": "^0.18.5",
+    "pdfjs-dist": "5.4.296"
+  },
+  "engines": {
+    "node": ">=22.16"
+  },
+  "license": "MIT",
+  "author": "xiaoouj",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaoouj/foreign-trade-workbench.git"
+  }
+}
