@@ -30,8 +30,13 @@ gui-test-screenshots/
 *.jpg
 *.jpeg
 *.webp
-# This reviewed changelog screenshot contains synthetic demo data only.
+# Reviewed README/changelog screenshots; all use synthetic demo data only.
 !docs/screenshots/product-catalog-synthetic.jpg
+!docs/screenshots/dashboard-synthetic.jpg
+!docs/screenshots/customers-synthetic.jpg
+!docs/screenshots/opportunities-synthetic.jpg
+!docs/screenshots/orders-synthetic.jpg
+!docs/screenshots/quotations-synthetic.jpg
 .DS_Store
 coverage/
 test-results/

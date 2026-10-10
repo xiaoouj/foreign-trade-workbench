@@ -12,11 +12,21 @@
 - PDF / Word / Excel / TXT / CSV 录入，报价明细与原文总额核对。
 - 管理员与业务员权限、审计记录、可选邮箱与 WhatsApp 接入。
 
-## 产品界面截图
+## 界面预览
 
-以下产品库界面使用合成产品与价格数据，仅用于展示界面，不含真实业务记录。
+截图中的客户、联系人、询盘、订单、报价及产品价格均为合成演示数据，不含真实业务记录。
 
-![产品库界面截图（合成数据）](docs/screenshots/product-catalog-synthetic.jpg)
+| 工作台 | 客户资料 |
+|:--:|:--:|
+| ![工作台截图（合成数据）](docs/screenshots/dashboard-synthetic.jpg) | ![客户资料截图（合成数据）](docs/screenshots/customers-synthetic.jpg) |
+
+| 商机看板 | 订单数据 |
+|:--:|:--:|
+| ![商机看板截图（合成数据）](docs/screenshots/opportunities-synthetic.jpg) | ![订单数据截图（合成数据）](docs/screenshots/orders-synthetic.jpg) |
+
+| 报价管理 | 产品库 |
+|:--:|:--:|
+| ![报价管理截图（合成数据）](docs/screenshots/quotations-synthetic.jpg) | ![产品库截图（合成数据）](docs/screenshots/product-catalog-synthetic.jpg) |
 
 公开版不包含真实客户数据、公司银行账户、原部署配置或任何预设 API 密钥。首次启动为空业务库。3D 装箱求解模块不在本 MIT 发行版内；体积/载重计算及装箱单单证仍保留。
 
