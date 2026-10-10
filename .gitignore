@@ -13,6 +13,9 @@ db-data/
 **/.backups/
 code-backup/
 outputs/
+import-source/
+**/import-source/
+gui-test-screenshots/
 *.log
 *.bak*
 *.pre-*

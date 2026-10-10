@@ -351,13 +351,14 @@ main { flex: 1; padding: 22px 14px; max-width: 1320px; margin: 0 auto; width: 10
 .table-wrap { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--line); overflow: auto; max-height: calc(100vh - 190px); }
 /* 隐藏列（列设置功能）：默认 display:none，不参与布局 */
 .data-table th.col-hidden, .data-table td.col-hidden { display: none; }
-/* 每个列表右上角的「列设置」齿轮按钮：绝对定位于 table-wrap 右上角，不挤占表格布局 */
+/* 列设置位于表格外的工具栏，横向滚动和固定表头均不会覆盖按钮。 */
 .table-wrap { position: relative; }
+.table-column-tools { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin:0 0 10px; }
 .col-cfg-btn {
-  position: absolute; top: 6px; right: 6px; z-index: 30;
-  width: 28px; height: 28px;
+  position: static; flex:none; padding:8px 12px;
+  width: auto; height: auto;
   border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
-  color: var(--ink-soft); font-size: 15px; line-height: 1; cursor: pointer;
+  color: var(--ink-soft); font-size: 13px; line-height: 1.4; cursor: pointer;
   box-shadow: var(--shadow-sm); display: flex; align-items: center; justify-content: center;
 }
 .col-cfg-btn:hover { color: var(--brand-ink); border-color: var(--brand); }

@@ -14,6 +14,9 @@ import { fileURLToPath } from 'node:url';
 // 数据访问层（MySQL / JSON 双后端，2026-08-21 升级）。对外 readJson/writeJson 签名不变，底层按 STORAGE_MODE 切换。
 import * as dal from './db/dal.js';
 import {normalizeSalesFields, createQuote, reviseQuote} from './sales-records.js';
+import { createCatalogRoutes } from './catalog-routes.js';
+import { createCatalogStore } from './catalog-store.js';
+import { quoteProductLines, visibleHistory } from './product-catalog.js';
 // AI 管家编排层（2026-08-26 P0）：工具协议 + 查询工具服务端执行；写动作返回前端确认后走现有 REST（继承 RBAC/审计）
 import { handleAiAgent } from './ai-agent.js';
 // 文档解析（PDF/Word/Excel，2026-09-14 升级：替换手写实现）
@@ -61,6 +64,29 @@ const BACKUP_KEEP = 30; // 每个数据文件保留最近 30 份历史版本
 const PORT = process.env.PORT || 4173;
 // 存储后端：'mysql' 或 'json'。由 ensureStore() 调用 dal.initDAL() 后确定（MySQL 不可用时自动降级 'json'）。
 let STORAGE_MODE = 'json';
+const catalogStore = createCatalogStore({ dataDir: DATA_DIR, read: readJson, write: writeJson, jsonRead, jsonWrite, dal, mode: () => STORAGE_MODE });
+const catalogRoutes = createCatalogRoutes({ root: __dirname,
+  read: base => readJson(path.join(DATA_DIR, base + '.json'), []),
+  write: (base, rows) => writeJson(path.join(DATA_DIR, base + '.json'), rows),
+  commit: catalogStore.commit, body: readBody, send: sendJson, audit: logAudit });
+async function enrichQuoteCatalog(input, user, previous = {}) {
+  if (!Array.isArray(input.items)) return input;
+  const products = await readJson(PRODUCTS_FILE);
+  const items = quoteProductLines(input.items, products, previous.items || []);
+  const history = visibleHistory(await readJson(path.join(DATA_DIR, 'product-history.json'), []), user, await readJson(CLIENTS_FILE));
+  const currency = input.currency || previous.currency || 'USD';
+  for (let i = 0; i < items.length; i++) {
+    const line = items[i]; if (!line.sourceHistoryId) continue;
+    const prior = previous.items?.[i];
+    if (prior?.sourceHistoryId === line.sourceHistoryId && prior.productId === line.productId && prior.unitPrice === line.unitPrice && previous.currency === currency) continue;
+    const source = history.find(r => r.id === line.sourceHistoryId && r.productId === line.productId);
+    if (!source) throw permissionError('无权引用该历史价格或产品关联不一致');
+    if (source.currency !== currency) throw permissionError('历史价格币种与报价币种不一致', 400);
+    if (source.unitPrice == null || source.unitPrice < 0) throw permissionError('历史明细没有可引用的单价', 400);
+  }
+  return { ...input, items };
+}
+
 
 // AI 默认配置：OpenAI 兼容接口（Ollama / LM Studio / vLLM / 云端均可）
 const AI_DEFAULT = {
@@ -89,7 +115,6 @@ function loadSecret() {
     return s;
   }
 }
-fs.mkdirSync(DATA_DIR, { recursive: true });
 const SECRET = loadSecret();
 
 // ---------- 密码哈希（scrypt + 盐） ----------
@@ -1180,6 +1205,7 @@ async function handleRequest(req, res, url, p, method) {
     const user = getCurrentUser(req);
     if (p.startsWith('/api/') && !user) return sendJson(res, 401, { error: '未登录' });
     req.user = user;
+    if (await catalogRoutes(req, res, url, p, method, user)) return;
 
     // ---------- 文件上传（base64 编码，前端用 FileReader 读取后提交） ----------
     // 仅接受 JSON body { filename, data: "base64..." }，存入 data/uploads/，返回访问路径
@@ -1614,7 +1640,7 @@ async function handleRequest(req, res, url, p, method) {
         const list = await readJson(QUOTATIONS_FILE);
         const now = Date.now();
         let item;
-        try { item = createQuote(withOwner(body,user),user,now,genId()); } catch(error) { return sendJson(res,400,{error:error.message}); }
+        try { item = createQuote(withOwner(await enrichQuoteCatalog(body, user),user),user,now,genId()); } catch(error) { return sendJson(res,error.status || 400,{error:error.message}); }
         list.push(item);
         await writeJson(QUOTATIONS_FILE, list);
         return sendJson(res, 201, item);
@@ -1632,7 +1658,7 @@ async function handleRequest(req, res, url, p, method) {
         return sendJson(res, 200, { ok: true });
       }
       const body = await readBody(req);
-      try { list[idx] = reviseQuote(list[idx],body,user,Date.now()); }
+      try { list[idx] = reviseQuote(list[idx],await enrichQuoteCatalog(body,user,list[idx]),user,Date.now()); }
       catch(error) { return sendJson(res,error.status||400,{error:error.message}); }
       await writeJson(QUOTATIONS_FILE, list);
       return sendJson(res, 200, list[idx]);
@@ -1764,37 +1790,6 @@ async function handleRequest(req, res, url, p, method) {
       const body = await readBody(req);
       list[idx] = { ...list[idx], ...body, id: emm[1], updatedAt: Date.now() };
       await writeJson(EMAILS_FILE, list);
-      return sendJson(res, 200, list[idx]);
-    }
-
-    // 产品内容库 CRUD（公司主数据，与供应商同级：全员共享，不做 owner 隔离）
-    if (p === '/api/products') {
-      if (method === 'GET') {
-        return sendJson(res, 200, await readJson(PRODUCTS_FILE));
-      }
-      if (method === 'POST') {
-        const body = await readBody(req);
-        const list = await readJson(PRODUCTS_FILE);
-        const now = Date.now();
-        const item = { id: genId(), createdAt: now, updatedAt: now, ...withOwner(body, user) };
-        list.push(item);
-        await writeJson(PRODUCTS_FILE, list);
-        return sendJson(res, 201, item);
-      }
-    }
-    const pm = p.match(/^\/api\/products\/([\w-]+)$/);
-    if (pm && (method === 'PUT' || method === 'DELETE')) {
-      const list = await readJson(PRODUCTS_FILE);
-      const idx = list.findIndex((o) => o.id === pm[1]);
-      if (idx === -1) return sendJson(res, 404, { error: 'not found' });
-      if (method === 'DELETE') {
-        list.splice(idx, 1);
-        await writeJson(PRODUCTS_FILE, list);
-        return sendJson(res, 200, { ok: true });
-      }
-      const body = await readBody(req);
-      list[idx] = { ...list[idx], ...body, id: pm[1], updatedAt: Date.now() };
-      await writeJson(PRODUCTS_FILE, list);
       return sendJson(res, 200, list[idx]);
     }
 
@@ -2700,6 +2695,7 @@ async function handleRequest(req, res, url, p, method) {
 
 releaseNotice = await createReleaseNotice(__dirname);
 await ensureStore();
+await catalogStore.recover();
 await migrateContacts();
 await dailySnapshot();
 server.listen(PORT, () => {

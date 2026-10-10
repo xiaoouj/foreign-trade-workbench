@@ -5,6 +5,8 @@
 **/db-data
 **/.backups
 code-backup
+**/import-source
+**/gui-test-screenshots
 .git
 *.log
 **/*.bak*

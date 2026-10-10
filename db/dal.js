@@ -72,6 +72,10 @@ const ARRAYS = {
   // 导致 MySQL 模式下 writeCollection 静默丢弃、readCollection 恒返回空数组 ——
   // 表现为「上传成功但点 AI 识别报导入任务不存在」。
   'crm-imports': { generic: true },
+  'product-history': { generic: true },
+  'product-documents': { generic: true },
+  'product-imports': { generic: true },
+  'product-category-settings': { generic: true },
 };
 
 const KV = ['settings', 'ai-config', 'mail', 'mail-sent', 'notifications', 'system-notices'];
@@ -451,6 +455,31 @@ export async function exportAll() {
 }
 
 export { DATA_DIR, ARRAYS, KV, OBJECTS };
+
+// Product/history imports and merges share one MySQL transaction.
+export async function commitCatalog(collections, connection) {
+  const allowed = new Set(['products', 'product-history', 'product-documents', 'product-imports', 'product-category-settings']);
+  const conn = connection || await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const [base, rows] of Object.entries(collections)) {
+      if (!allowed.has(base) || !Array.isArray(rows)) throw new Error('Invalid catalog collection');
+      const table = tableOf(base);
+      await conn.query('DELETE FROM `' + table + '`');
+      // Bound each query by count and payload size, keeping below MySQL packet limits.
+      let batch = [], bytes = 0;
+      const flush = async () => { if (batch.length) await conn.query('INSERT INTO `' + table + '` (id, data) VALUES ?', [batch]); batch = []; bytes = 0; };
+      for (const row of rows) {
+        const text = JSON.stringify(row), size = Buffer.byteLength(text);
+        if (batch.length >= 100 || bytes + size > 512 * 1024) await flush();
+        batch.push([row.id, text]); bytes += size;
+      }
+      await flush();
+    }
+    await conn.commit();
+  } catch (error) { await conn.rollback(); throw error; }
+  finally { conn.release(); }
+}
 
 // Update only selected order fields, in one transaction; never rewrite the collection.
 export async function patchOrders(ids, patch, canAccess) {

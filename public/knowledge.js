@@ -4,6 +4,7 @@ const KB_CATEGORIES = ['产品', '客户', '报价', '物流', '单证', '展会
 const KB_STATUS_BADGE = { 草稿: 'info', 已发布: 'ok', 已归档: 'muted' };
 
 let kbItems = [];
+let kbSection = 'documents';
 let kbFilter = { category: '', status: '', q: '' };
 
 async function loadKnowledge() {
@@ -134,30 +135,40 @@ window.onViewActivated = (function (orig) {
   };
 })(window.onViewActivated);
 
+function selectKnowledgeSection(section) {
+  kbSection = section;
+  const sec = document.getElementById('view-knowledge'); if (!sec?.querySelector('#kbDocumentsPanel')) return;
+  sec.querySelector('#kbDocumentsPanel').hidden = section !== 'documents';
+  sec.querySelector('#kbHistoryPanel').hidden = section !== 'history';
+  sec.querySelector('#kbNew').hidden = section !== 'documents';
+  sec.querySelectorAll('[data-kb-section]').forEach(b => b.classList.toggle('active', b.dataset.kbSection === section));
+  if (section === 'history') loadQuoteHistory(); else refreshKb();
+}
+window.openHistoricalQuotes = () => {
+  kbSection = 'history';
+  if (location.hash === '#/knowledge') selectKnowledgeSection('history');
+  else location.hash = '#/knowledge';
+};
 async function renderKnowledgeView() {
   const sec = document.getElementById('view-knowledge');
   if (!sec) return;
   sec.innerHTML = `
-    <div class="view-head" style="justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:12px">
-        <h2>资料 / 知识库</h2>
-        <span class="muted">类目化沉淀产品、流程、经验，支持版本与审核</span>
-      </div>
-      <button class="btn-primary" id="kbNew">+ 新建资料</button>
-    </div>
-    <div class="kb-toolbar">
+    <div class="sales-page-heading"><div><div class="page-eyebrow">KNOWLEDGE</div><h2>资料 / 知识库</h2><p>沉淀业务资料、客户历史报价和来源单据</p></div><div class="sales-actions"><button type="button" class="btn-primary" id="kbNew">＋ 新建资料</button></div></div>
+    <div class="sales-tabs knowledge-sections"><button type="button" data-kb-section="documents">业务资料</button><button type="button" data-kb-section="history" id="kbHistory">客户历史报价</button></div>
+    <div id="kbDocumentsPanel"><div class="kb-toolbar">
       <label>搜索 <input id="kbSearch" placeholder="标题 / 正文关键词"/></label>
       <label>状态 <select id="kbStatus">
         <option value="">全部</option><option value="草稿">草稿</option><option value="已发布">已发布</option><option value="已归档">已归档</option>
       </select></label>
-      <button class="btn-ghost" id="kbRefresh">刷新</button>
+      <button type="button" class="btn-ghost" id="kbRefresh">刷新</button>
     </div>
     <div id="kbCats" class="kb-cats"></div>
-    <div id="kbGrid" class="kb-grid"></div>`;
+    <div id="kbGrid" class="kb-grid"></div></div><div id="kbHistoryPanel" hidden></div>`;
+  sec.querySelectorAll('[data-kb-section]').forEach(b => b.onclick = () => selectKnowledgeSection(b.dataset.kbSection));
   document.getElementById('kbNew').onclick = () => kbEdit('');
   document.getElementById('kbRefresh').onclick = () => refreshKb();
-  const s = document.getElementById('kbSearch'); s.oninput = () => { kbFilter.q = s.value; refreshKb(); };
-  const st = document.getElementById('kbStatus'); st.onchange = () => { kbFilter.status = st.value; refreshKb(); };
+  const s = document.getElementById('kbSearch'); s.value = kbFilter.q; s.oninput = () => { kbFilter.q = s.value; refreshKb(); };
+  const st = document.getElementById('kbStatus'); st.value = kbFilter.status; st.onchange = () => { kbFilter.status = st.value; refreshKb(); };
   sec.querySelector('#kbGrid').innerHTML = '<div class="empty">加载中…</div>';
-  await refreshKb();
+  selectKnowledgeSection(kbSection);
 }

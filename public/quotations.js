@@ -158,6 +158,7 @@ function openQuoteModal(id, prefill) {
       <b>报价明细</b>
       <button type="button" class="btn-mini" id="qtAddLine">+ 添加分项</button>
     </div>
+    <div id="qtProductPicker" class="catalog-picker" hidden></div>
     <div id="qtLines" class="qt-lines">${linesHtml}</div>
     <div class="qt-total">合计：<span id="qtTotalDisplay">--</span></div>
     <input type="hidden" name="inquiryId" value="${esc(q.inquiryId || '')}" />
@@ -265,7 +266,8 @@ window.openQuoteModal = openQuoteModal;
 
 function renderQuoteLineRow(it, idx) {
   const typeOpts = QT_LINE_TYPES.map((t) => `<option value="${t.code}" ${t.code === it.type ? 'selected' : ''}>${t.name}</option>`).join('');
-  return `<div class="qt-line" data-idx="${idx}">
+  return `<div class="qt-line" data-idx="${idx}" data-product-id="${esc(it.productId || '')}" data-source-history-id="${esc(it.sourceHistoryId || '')}">
+    <div class="qt-product-actions"><button type="button" class="btn-ghost btn-mini qt-select-product">从产品库选择</button><button type="button" class="btn-ghost btn-mini qt-unlink-product">移除产品关联</button><span class="qt-product-label">${it.productId ? '已关联产品档案' : '可选择产品和同币种历史价格'}</span></div>
     <div class="qt-line-grid">
       <div class="field"><label>类型</label><select class="qt-type" data-idx="${idx}">${typeOpts}</select></div>
       <div class="field"><label>名称</label><input class="qt-name" data-idx="${idx}" value="${esc(it.name || '')}" placeholder="项目名称" /></div>
@@ -282,6 +284,8 @@ function renderQuoteLineRow(it, idx) {
 function bindQuoteLineEvents() {
   const wrap = $('#qtLines');
   if (!wrap) return;
+  wrap.querySelectorAll('.qt-select-product').forEach(button => button.onclick = () => window.openQuoteProductPicker(button.closest('.qt-line')));
+  wrap.querySelectorAll('.qt-unlink-product').forEach(button => button.onclick = () => { const row = button.closest('.qt-line'); row.dataset.productId = ''; row.dataset.sourceHistoryId = ''; row.querySelector('.qt-product-label').textContent = '已移除关联，填写内容保留'; });
   wrap.querySelectorAll('.qt-type').forEach((el) => el.onchange = () => {
     const idx = +el.dataset.idx;
     const line = getQuoteLine(idx);
@@ -319,6 +323,8 @@ function getQuoteLine(idx) {
     unit: row.querySelector('.qt-unit').value,
     unitPrice: Number(row.querySelector('.qt-price').value) || 0,
     description: row.querySelector('.qt-desc').value,
+    ...(row.dataset.productId ? { productId: row.dataset.productId } : {}),
+    ...(row.dataset.sourceHistoryId ? { sourceHistoryId: row.dataset.sourceHistoryId } : {}),
   };
 }
 

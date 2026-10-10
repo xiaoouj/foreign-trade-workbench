@@ -4329,6 +4329,14 @@ function openUserMgmt(keepOpen) {
   function loadCfg(key) {
     try {
       const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}')[key] || null;
+      if (key === 'productBody' && cfg && currentUser && cfg.schemaVersion !== 3) {
+        const legacy = ['admin','manager'].includes(currentUser.role) ? ['check','name','model','category','unit','price','completeness','ops'] : ['name','model','category','unit','price','completeness','ops'];
+        const fieldOf = k => /^c\d+$/.test(String(k)) ? legacy[Number(String(k).slice(1))] : k;
+        cfg.hiddenKeys = (cfg.hiddenKeys || (cfg.hidden || []).map(i => 'c'+i)).map(fieldOf).filter(Boolean);
+        cfg.labelKeys = Object.fromEntries(Object.entries(cfg.labelKeys || Object.fromEntries(Object.entries(cfg.labels || {}).map(([i,v])=>['c'+i,v]))).map(([k,v])=>[fieldOf(k),v]).filter(([k])=>k));
+        cfg.orderKeys = [...new Set((cfg.orderKeys || (cfg.order || []).map(i=>'c'+i)).map(fieldOf).filter(Boolean))];
+        delete cfg.hidden; delete cfg.labels; delete cfg.order; cfg.schemaVersion = 3;
+      }
       // Pre-key settings refer to the old 16 columns; adding owner must not shift them.
       if (key === 'clientBody' && cfg && (!cfg.hiddenKeys || !cfg.labelKeys)) {
         const oldKeys = ['check','star','name','contact','country','phase','grade','source','phone','prod','comm','health','ai','created','rel','ops'];
@@ -4406,6 +4414,7 @@ function openUserMgmt(keepOpen) {
       keys.forEach((k) => {
         if (ord.includes(k)) return;
         if (tableKey(table)==='orderBody' && k==='owner') ord.splice(Math.max(0,ord.indexOf('c2')+1),0,k);
+        else if (tableKey(table)==='productBody' && k !== 'ops' && ord.includes('ops')) ord.splice(ord.indexOf('ops'),0,k);
         else ord.push(k);
       });
       return ord;
@@ -4497,17 +4506,30 @@ function openUserMgmt(keepOpen) {
     try { saveUiPref({ tableCols: JSON.parse(localStorage.getItem('ftw_table_cols_v1') || '{}') }); } catch (e) {}
   }
 
-  // 注入 ⚙ 按钮（每个 table-wrap 一个；客户资料页改用工具栏固定按钮，不注入）
+  // 列设置统一放在表格外；已有固定工具栏按钮的客户、订单列表继续复用。
   function injectBtn(table) {
     const wrap = table.closest('.table-wrap');
-    if (!wrap || wrap.querySelector('.col-cfg-btn')) return;
+    if (!wrap) return;
     if (table.tBodies[0] && ['clientBody','orderBody'].includes(table.tBodies[0].id)) return;
-    const btn = document.createElement('button');
-    btn.className = 'col-cfg-btn';
-    btn.title = '列设置：显示/隐藏列、自定义表头';
-    btn.textContent = '⚙';
-    btn.addEventListener('click', (e) => { e.stopPropagation(); openColCfg(table); });
-    wrap.appendChild(btn);
+    let tools = table.dataset.columnToolbar && document.querySelector(table.dataset.columnToolbar);
+    if (!tools || wrap.contains(tools)) {
+      tools = wrap.__columnTools;
+      if (!tools?.isConnected) {
+        tools = document.createElement('div');
+        tools.className = 'table-column-tools';
+        wrap.before(tools); wrap.__columnTools = tools;
+      }
+    }
+    let btn = table.__columnButton;
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'col-cfg-btn btn-ghost btn-mini';
+      btn.title = '列设置：显示/隐藏列、自定义表头';
+      btn.textContent = '列设置';
+      btn.addEventListener('click', (e) => { e.stopPropagation(); openColCfg(table); });
+      table.__columnButton = btn;
+    }
+    if (btn.parentElement !== tools) tools.appendChild(btn);
   }
 
   // 供页面工具栏按钮调用（按 tbody id 定位表格）
