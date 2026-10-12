@@ -1,4 +1,4 @@
-# Foreign Trade Workbench · 外贸工作台
+# Foreign Trade Workbench · 外贸CRM
 
 面向外贸团队的自托管 CRM。原生 JavaScript 前端、Node.js HTTP 后端，默认以 JSON 文件存储，可选 MySQL / MariaDB。界面以中文为主，贸易单证支持中英文。
 
