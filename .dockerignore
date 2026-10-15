@@ -13,3 +13,6 @@ code-backup
 **/*.pdf
 **/*.png
 **/*.jpg
+
+import-source
+!public/category-images/*.png

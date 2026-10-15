@@ -13,7 +13,7 @@ test('quotation client creation: duplicate protection and permissions', {timeout
   const data = await fs.mkdtemp(path.join(os.tmpdir(),'ftw-update-api-'));
   const probe=net.createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(r=>probe.close(r));
   const password=crypto.randomUUID();
-  const child=spawn(process.execPath,['server.js'],{cwd:root,env:{...process.env,FTW_DATA_DIR:data,FTW_STORAGE:'json',PORT:String(port),FTW_ADMIN_PASSWORD:password},stdio:['ignore','pipe','pipe']});
+  let child=spawn(process.execPath,['server.js'],{cwd:root,env:{...process.env,FTW_DATA_DIR:data,FTW_STORAGE:'json',PORT:String(port),FTW_ADMIN_PASSWORD:password},stdio:['ignore','pipe','pipe']});
   let log='';child.stdout.on('data',d=>log+=d);child.stderr.on('data',d=>log+=d);
   t.after(async()=>{if(child.exitCode===null){child.kill('SIGTERM');await once(child,'exit');}await fs.rm(data,{recursive:true,force:true});});
   const base='http://127.0.0.1:'+port;
@@ -31,11 +31,21 @@ test('quotation client creation: duplicate protection and permissions', {timeout
   assert.equal((await post('/api/clients/from-quotation',{company:' '},sales)).status,400);
   const requests=Array.from({length:5},()=>post('/api/clients/from-quotation',{company:' New Customer ',contactName:'Alice',country:'智利',owner:sales.id,quoteId:q.id},sales));
   const responses=await Promise.all(requests);assert.equal(responses.filter(r=>r.status===201).length,1);assert.equal(responses.filter(r=>r.status===200).length,4);
-  const results=await Promise.all(responses.map(r=>r.json()));assert.equal(new Set(results.map(r=>r.client.id)).size,1);assert.equal(results[0].client.contactName,'Alice');assert.equal(results[0].client.country,'智利');
+  const results=await Promise.all(responses.map(r=>r.json()));assert.equal(new Set(results.map(r=>r.client.id)).size,1);assert.equal(results[0].client.contactName,'Alice');assert.equal(results[0].client.country,'智利');assert.equal(results[0].client.source,'阿里巴巴');
   const existing=await (await post('/api/clients/from-quotation',{company:'new customer',contactName:'Do not overwrite'},sales)).json();assert.equal(existing.created,false);assert.equal(existing.client.contactName,'Alice');
   const foreignQ=await (await post('/api/quotations',{clientName:'Foreign'},admin)).json();
   assert.equal((await post('/api/clients/from-quotation',{company:'Foreign',quoteId:foreignQ.id},sales)).status,403);
   await post('/api/clients',{company:'Private Company'},admin);
   const own=await (await post('/api/clients/from-quotation',{company:'Private Company'},sales)).json();assert.equal(own.created,true);assert.equal(own.client.owner,sales.id);
   assert.equal((await (await get('/api/clients',sales)).json()).length,2);
+  // Upgrade legacy source values while retaining other legitimate sources, with a recoverable backup.
+  const clientFile=path.join(data,'clients.json'),stored=JSON.parse(await fs.readFile(clientFile,'utf8'));
+  const changedId=results[0].client.id;stored.find(c=>c.id===changedId).source='报价建档';stored.find(c=>c.id!==changedId).source='官网';
+  child.kill('SIGTERM');await once(child,'exit');await fs.writeFile(clientFile,JSON.stringify(stored));
+  child=spawn(process.execPath,['server.js'],{cwd:root,env:{...process.env,FTW_DATA_DIR:data,FTW_STORAGE:'json',PORT:String(port),FTW_ADMIN_PASSWORD:password},stdio:['ignore','pipe','pipe']});
+  child.stdout.on('data',d=>log+=d);child.stderr.on('data',d=>log+=d);
+  for(let i=0;i<200;i++){if(child.exitCode!==null)throw Error(log);try{if((await fetch(base+'/api/version')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
+  const upgraded=JSON.parse(await fs.readFile(clientFile,'utf8'));assert.equal(upgraded.find(c=>c.id===changedId).source,'阿里巴巴');assert.equal(upgraded.find(c=>c.id!==changedId).source,'官网');
+  assert((await fs.readdir(path.join(data,'backups'))).some(n=>n.startsWith('quote-client-source-before-')));
+
 });

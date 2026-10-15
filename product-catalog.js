@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+export const SOURCE_URL = '';
 export const isCatalogManager = user => !!user && ['admin', 'manager'].includes(user.role);
 export const key = value => String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
 const str = value => String(value ?? '').trim();

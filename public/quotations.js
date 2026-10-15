@@ -44,8 +44,26 @@ function qtStatusBadge(st) {
   return `<span class="status-tag status-${map[st] || 'draft'}">${esc(st || '草稿')}</span>`;
 }
 
+function qtCreatedDate(value){
+ if(value==null||value==='')return '—';
+ const d=new Date(typeof value==='string'&&/^\d+$/.test(value)?Number(value):value);
+ if(isNaN(d))return '—';
+ return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+}
+function qtInlineStatus(q){return `<select class="qt-inline-status" data-no-combo data-qt-status-edit="${esc(q.id)}" aria-label="${esc(q.quoteNo||'报价')} 状态">${QT_STATUSES.map(st=>`<option value="${esc(st)}" ${st===(q.status||'草稿')?'selected':''}>${esc(st)}</option>`).join('')}</select>`;}
+async function saveQtInlineStatus(select){
+ const q=quotations.find(q=>q.id===select.dataset.qtStatusEdit);if(!q)return;
+ const previous=q.status||'草稿',status=select.value;if(status===previous)return;
+ select.disabled=true;
+ try{
+  const response=await api('/api/quotations/'+encodeURIComponent(q.id),{method:'PUT',body:JSON.stringify({status,baseVersion:q.version||1})});
+  const result=await response.json().catch(()=>({}));if(!response.ok)throw Error(result.error||'状态保存失败');
+  Object.assign(q,result);renderQuotations();window.dispatchEvent(new Event('ftw:quotationsChanged'));toast('报价状态已更新');
+ }catch(error){select.value=previous;toast(error.message||'状态保存失败，请重试');}finally{select.disabled=false;}
+}
+
 let qtPage = 1;
-const QT_PAGE_SIZE = 10;
+let qtPageSize = (()=>{try{const size=Number(localStorage.getItem('ftw.qtPageSize'));return [10,20,50].includes(size)?size:10;}catch{return 10;}})();
 
 let qtSelectedId = null;
 function renderQuotations() {
@@ -61,19 +79,20 @@ function renderQuotations() {
   if(qtSearchQ)list=list.filter(q=>[q.quoteNo,q.clientName,q.projectName,q.contactName].some(v=>String(v||'').toLowerCase().includes(qtSearchQ)));
   if(currency.value)list=list.filter(q=>(q.currency||'USD')===currency.value);
   const from=$('#qtDateFrom').value,to=$('#qtDateTo').value;
-  if(from||to)list=list.filter(q=>{const day=q.createdAt?new Date(q.createdAt).toISOString().slice(0,10):'';return day&&(!from||day>=from)&&(!to||day<=to);});
+  if(from||to)list=list.filter(q=>{const day=q.createdAt?qtCreatedDate(q.createdAt):'';return day&&(!from||day>=from)&&(!to||day<=to);});
   $('#qtStatusTabs').innerHTML=['',...QT_STATUSES].map(status=>`<button data-qt-status="${esc(status)}" class="${qtFilterStatus===status?'active':''}" aria-pressed="${qtFilterStatus===status}">${esc(status||'全部报价')} <small>${quotations.filter(q=>!status||q.status===status).length}</small></button>`).join('');
   $('#qtStatusTabs').querySelectorAll('button').forEach(button=>button.onclick=()=>{qtFilterStatus=button.dataset.qtStatus;$('#qtStatusFilter').value=qtFilterStatus;qtPage=1;renderQuotations();});
   $('#qtMeta').textContent='共 '+list.length+' 份报价';
-  const totalPages=Math.max(1,Math.ceil(list.length/QT_PAGE_SIZE));qtPage=Math.min(qtPage,totalPages);
-  const pageList=list.slice((qtPage-1)*QT_PAGE_SIZE,qtPage*QT_PAGE_SIZE);renderQtPagination(list.length,totalPages);
+  const totalPages=Math.max(1,Math.ceil(list.length/qtPageSize));qtPage=Math.min(qtPage,totalPages);
+  const pageList=list.slice((qtPage-1)*qtPageSize,qtPage*qtPageSize);renderQtPagination(list.length,totalPages);
   if(!pageList.some(q=>q.id===qtSelectedId))qtSelectedId=pageList[0]?.id||null;
   if(!pageList.length){body.innerHTML='<tr><td colspan="10" class="empty">暂无符合条件的报价</td></tr>';$('#qtSelectedDetail').innerHTML='';return;}
-  body.innerHTML=pageList.map(q=>`<tr class="${q.id===qtSelectedId?'sales-selected':''}" data-select-quote="${esc(q.id)}"><td data-col="quoteNo"><button class="sales-link" data-qt-select="${esc(q.id)}">${esc(q.quoteNo||'未填写')}</button></td><td data-col="clientName">${esc(q.clientName||'未填写')}</td><td data-col="amount" class="sales-nowrap">${salesMoney(qtTotal(q.items),q.currency)}</td><td data-col="tradeTerms">${esc(q.tradeTerms||'—')}</td><td data-col="validUntil" class="sales-nowrap">${esc(q.validUntil||'—')}</td><td data-col="status">${qtStatusBadge(q.status)}</td><td data-col="revision"><span class="sales-round">${Math.max(0,(Number(q.version)||1)-1)} 轮</span></td><td data-col="owner">${esc(q.ownerName||'—')}</td><td data-col="projectName">${esc(q.projectName||'—')}</td><td data-col="ops" class="sales-nowrap"><button class="sales-link" data-qt-edit="${esc(q.id)}">编辑</button><button class="sales-link" data-qt-doc="${esc(q.id)}">预览</button><button class="sales-link danger" data-qt-del="${esc(q.id)}">删除</button></td></tr>`).join('');
-  body.querySelectorAll('[data-select-quote]').forEach(row=>row.onclick=e=>{if(e.target.closest('[data-qt-edit],[data-qt-doc],[data-qt-del]'))return;qtSelectedId=row.dataset.selectQuote;renderQuotations();});
+  body.innerHTML=pageList.map(q=>`<tr class="${q.id===qtSelectedId?'sales-selected':''}" data-select-quote="${esc(q.id)}"><td data-col="quoteNo"><button class="sales-link" data-qt-select="${esc(q.id)}">${esc(q.quoteNo||'未填写')}</button></td><td data-col="clientName">${esc(q.clientName||'未填写')}</td><td data-col="amount" class="sales-nowrap">${salesMoney(qtTotal(q.items),q.currency)}</td><td data-col="tradeTerms">${esc(q.tradeTerms||'—')}</td><td data-col="createdAt" class="sales-nowrap">${qtCreatedDate(q.createdAt)}</td><td data-col="status">${qtInlineStatus(q)}</td><td data-col="revision"><span class="sales-round">${Math.max(0,(Number(q.version)||1)-1)} 轮</span></td><td data-col="owner">${esc(q.ownerName||'—')}</td><td data-col="projectName">${esc(q.projectName||'—')}</td><td data-col="ops" class="sales-nowrap"><button class="sales-link" data-qt-edit="${esc(q.id)}">编辑</button><button class="sales-link" data-qt-doc="${esc(q.id)}">预览</button><button class="sales-link danger" data-qt-del="${esc(q.id)}">删除</button></td></tr>`).join('');
+  body.querySelectorAll('[data-select-quote]').forEach(row=>row.onclick=e=>{if(e.target.closest('[data-qt-edit],[data-qt-doc],[data-qt-del],[data-qt-status-edit]'))return;qtSelectedId=row.dataset.selectQuote;renderQuotations();});
   body.querySelectorAll('[data-qt-edit]').forEach(b=>b.onclick=()=>openQuoteModal(b.dataset.qtEdit));
   body.querySelectorAll('[data-qt-doc]').forEach(b=>b.onclick=()=>openQuoteDoc(b.dataset.qtDoc));
   body.querySelectorAll('[data-qt-del]').forEach(b=>b.onclick=async()=>{if(!confirm('确认删除该报价单？'))return;const r=await api('/api/quotations/'+b.dataset.qtDel,{method:'DELETE'});if(!r.ok)return toast('删除失败');toast('已删除');loadQuotations();});
+  body.querySelectorAll('[data-qt-status-edit]').forEach(select=>select.onchange=()=>saveQtInlineStatus(select));
   renderQuoteSelected();
 }
 function quoteItemsTable(q){return `<div class="sales-item-scroll"><table><thead><tr><th>产品 / 规格</th><th>数量</th><th>单价</th><th>金额（${esc(q.currency||'USD')}）</th></tr></thead><tbody>${(q.items||[]).map(it=>`<tr><td><b>${esc(it.name||'—')}</b><small>${esc(it.description||'')}</small></td><td>${esc(it.qty??'')} ${esc(it.unit||'')}</td><td>${Number(it.unitPrice||0).toLocaleString()}</td><td>${(Number(it.qty||0)*Number(it.unitPrice||0)).toLocaleString()}</td></tr>`).join('')||'<tr><td colspan="4">未登记产品明细</td></tr>'}</tbody></table></div>`;}
@@ -89,7 +108,8 @@ function renderQuoteSelected(){
 
 function renderQtPagination(total, totalPages) {
   const footMeta = $('#qtFootMeta');
-  if (footMeta) footMeta.textContent = total ? `显示 ${Math.min((qtPage - 1) * QT_PAGE_SIZE + 1, total)} - ${Math.min(qtPage * QT_PAGE_SIZE, total)} / ${total} 条` : '0 条';
+  if (footMeta) footMeta.textContent = total ? `显示 ${Math.min((qtPage - 1) * qtPageSize + 1, total)} - ${Math.min(qtPage * qtPageSize, total)} / ${total} 条` : '0 条';
+  if ($('#qtPageSize')) $('#qtPageSize').value=String(qtPageSize);
   const pager = $('#qtPagination');
   if (!pager) return;
   if (totalPages <= 1) { pager.innerHTML = ''; return; }
@@ -118,9 +138,13 @@ function defaultQuoteLine(type) {
   return { type: t, name: QT_LINE_TYPES.find((x) => x.code === t)?.name || '', description: '', qty: 1, unit: 'SET', unitPrice: 0 };
 }
 
+const qtNumberKey=value=>String(value||'').normalize('NFKC').replace(/\s+/g,'').toUpperCase();
+function qtSameNumberMatches(number,customer){return quotations.filter(q=>qtNumberKey(q.quoteNo)===qtNumberKey(number)&&qtNumberKey(number)&&inquiryRecordMatches(q,customer));}
 function openQuoteModal(id, prefill) {
-  const q = (id && quotations.find((x) => x.id === id)) || prefill || {};
-  const editId = id || (prefill && prefill.id) || '';
+  let q = (id && quotations.find((x) => x.id === id)) || prefill || {};
+  let editId = id || (prefill && prefill.id) || '';
+  let importedVersion=false;
+  if(!editId&&prefill?.quoteNo){const matches=qtSameNumberMatches(prefill.quoteNo,prefill);if(matches.length===1){const existing=matches[0],incoming=Object.fromEntries(Object.entries(prefill).filter(([,value])=>value!=null&&value!==''));editId=existing.id;q={...existing,...incoming,quoteNo:existing.quoteNo,owner:existing.owner,ownerName:existing.ownerName,status:prefill.status||existing.status,inquiryId:existing.inquiryId,orderId:existing.orderId,version:existing.version};importedVersion=true;}}
   const companyKey = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
   const knownClient = clients.find(c => c.id === q.clientId && companyKey(c.company) === companyKey(q.clientName)) || clients.find(c => companyKey(c.company) === companyKey(q.clientName));
   const clientOpts = ['<option value="">— 选择客户 —</option>', ...(q.clientName && !knownClient ? [`<option value="${esc(q.clientName)}" selected>${esc(q.clientName)}（未建档）</option>`] : []), ...clients.map((c) => `<option value="${esc(c.company)}" ${c.id === knownClient?.id ? 'selected' : ''}>${esc(c.company)}</option>`)].join('');
@@ -135,6 +159,7 @@ function openQuoteModal(id, prefill) {
   const linesHtml = lines.map((it, idx) => renderQuoteLineRow(it, idx)).join('');
 
   openModal(editId ? '编辑报价单' : '新增报价单', `
+    <p class="field full muted" id="qtVersionHint">${importedVersion?'检测到同编号报价，保存后更新原报价并保留修改记录。':''}</p>
     <div class="form-grid">
       ${field('报价单号 *', 'quoteNo', q.quoteNo || suggestQuoteNo(), 'text', 'required')}
       <div class="field"><label>客户公司 *</label><select name="clientName" required>${clientOpts}</select><div class="qt-client-create"><button type="button" class="btn-ghost btn-mini" id="qtCreateClient" hidden>＋ 一键建档客户</button><span id="qtClientArchiveStatus" class="muted" role="status"></span></div></div>
@@ -161,15 +186,20 @@ function openQuoteModal(id, prefill) {
     <div id="qtProductPicker" class="catalog-picker" hidden></div>
     <div id="qtLines" class="qt-lines">${linesHtml}</div>
     <div class="qt-total">合计：<span id="qtTotalDisplay">--</span></div>
-    <input type="hidden" name="inquiryId" value="${esc(q.inquiryId || '')}" />
+    ${inquirySelectorHtml(q.inquiryId)}
     <input type="hidden" name="orderId" value="${esc(q.orderId || '')}" />
   `, { wide: true });
 
   bindSalesPercentControls($('#modalForm'));
+  bindInquirySelector($('#modalForm'),q);
   bindQuoteLineEvents();
   updateQuoteTotal();
 
   const form = $('#modalForm');
+  let statusTouched=false;
+  form.querySelector('[name=status]').addEventListener('change',()=>{statusTouched=true;});
+  const versionHint=()=>{if(editId)return;const customer={clientName:form.elements.clientName.value,clientId:clients.find(c=>c.company===form.elements.clientName.value)?.id},matches=qtSameNumberMatches(form.elements.quoteNo.value,customer);$('#qtVersionHint').textContent=matches.length===1?'同编号报价已存在，保存将更新原报价，不会新增记录。':matches.length>1?'同编号存在多份记录，需要先核对合并。':'';};
+  form.elements.quoteNo.addEventListener('input',versionHint);form.elements.clientName.addEventListener('change',versionHint);
   const clientSel = form.querySelector('select[name="clientName"]');
   const normCompany = companyKey;
   let archivedClient = null, creatingClient = false;
@@ -252,13 +282,16 @@ function openQuoteModal(id, prefill) {
       items,
       totalAmount: total,
     };
-    const url = editId ? '/api/quotations/' + editId : '/api/quotations';
-    const m = editId ? 'PUT' : 'POST';
+    const matches=editId?[]:qtSameNumberMatches(body.quoteNo,body),existing=matches.length===1?matches[0]:null,targetId=editId||existing?.id;
+    if(matches.length>1)return toast('同编号存在多份记录，请先核对合并');
+    if(existing){for(const key of Object.keys(body))if((body[key]===''||body[key]==null)&&existing[key]!=null)delete body[key];body.baseVersion=existing.version||1;body.owner=existing.owner;body.ownerName=existing.ownerName;body.quoteNo=existing.quoteNo;if(!statusTouched)body.status=existing.status||'草稿';for(const key of ['inquiryId','orderId'])if(!body[key])body[key]=existing[key]||null;}
+    const url = targetId ? '/api/quotations/' + targetId : '/api/quotations';
+    const m = targetId ? 'PUT' : 'POST';
     quoteSaving=true;
     try {
     const r = await api(url, { method: m, body: JSON.stringify(body) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); toast('保存失败：' + (j.error || r.status)); return; }
-    const saved=await r.json();qtSelectedId=saved.id;toast('已保存'); closeModal(); loadQuotations();
+    const saved=await r.json();qtSelectedId=saved.id;toast(importedVersion||existing?'已更新原报价，修改记录已保留':saved.inquiryId&&!q.inquiryId?'报价已保存，已自动建立关联商机':'已保存'); closeModal(); loadQuotations();
     } catch(error){toast('保存失败：'+error.message);} finally {quoteSaving=false;}
   };
 }
@@ -417,6 +450,7 @@ async function convertQuoteToOrder(qid) {
     owner: q.owner || (currentUser ? currentUser.id : ''),
     ownerName: q.ownerName || (currentUser ? currentUser.name : ''),
     quoteId: q.id,
+    inquiryId:q.inquiryId||null,
     items: JSON.parse(JSON.stringify(q.items || [])),
   };
   const r = await api('/api/orders', { method: 'POST', body: JSON.stringify(body) });
@@ -455,6 +489,8 @@ function openQuoteDoc(qid) {
 window.openQuoteDoc = openQuoteDoc;
 
 function initQuotationsView() {
+  const pageSize=$('#qtPageSize');
+  if(pageSize){pageSize.value=String(qtPageSize);pageSize.onchange=()=>{const size=Number(pageSize.value);if(![10,20,50].includes(size))return;qtPageSize=size;qtPage=1;try{localStorage.setItem('ftw.qtPageSize',String(size));}catch{}renderQuotations();};}
   const search = $('#qtSearch');
   if (search) search.addEventListener('input', (e) => { qtPage=1;qtSearchQ = e.target.value.trim().toLowerCase(); renderQuotations(); });
   const filter = $('#qtStatusFilter');

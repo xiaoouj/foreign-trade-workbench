@@ -40,7 +40,7 @@ async function loadQuoteHistory() {
     const head = host.querySelector('#historyHead'), body = host.querySelector('#historyBody');
     if (tab === 'imports') {
       head.innerHTML = '<tr><th>来源</th><th>导入时间 / 人员</th><th>明细 / 单据</th><th>新增产品</th><th>状态</th></tr>';
-      body.innerHTML = data.map(b => `<tr><td><b>${esc(b.filename || '客户报价知识库')}</b>${b.sourceUrl ? `<small><a href="${esc(b.sourceUrl)}" target="_blank" rel="noopener">查看 WorkBuddy 来源</a></small>` : ''}<small>${esc(b.sourceGeneratedDate || '')}</small></td><td>${new Date(b.importedAt).toLocaleString('zh-CN')}<small>${esc(b.importedByName || '管理员')}</small></td><td>${catalogNumber(b.counts?.total)} 条 / ${catalogNumber(b.documents)} 份</td><td>${catalogNumber(b.counts?.created)}</td><td><span class="badge ok">已导入</span></td></tr>`).join('') || '<tr><td colspan="5" class="empty">暂无导入记录，点击「导入报价数据」上传</td></tr>';
+      body.innerHTML = data.map(b => `<tr><td><b>${esc(b.filename || '历史报价导入')}</b>${/^https?:\/\//i.test(b.sourceUrl || '') ? `<small><a href="${esc(b.sourceUrl)}" target="_blank" rel="noopener">查看 WorkBuddy 来源</a></small>` : ''}<small>${esc(b.sourceGeneratedDate || '')}</small></td><td>${new Date(b.importedAt).toLocaleString('zh-CN')}<small>${esc(b.importedByName || '管理员')}</small></td><td>${catalogNumber(b.counts?.total)} 条 / ${catalogNumber(b.documents)} 份</td><td>${catalogNumber(b.counts?.created)}</td><td><span class="badge ok">已导入</span></td></tr>`).join('') || '<tr><td colspan="5" class="empty">暂无导入记录，点击「导入报价数据」上传</td></tr>';
       host.querySelector('#historyCount').textContent = `共 ${data.length} 次导入`;
       return;
     }
@@ -67,7 +67,7 @@ async function loadQuoteHistory() {
 window.refreshHistoricalQuotes = loadQuoteHistory;
 
 async function openQuoteDataImport() {
-  openModal('导入报价数据', `<div class="catalog-detail"><div class="field"><label>选择报价数据文件（CSV / JSON）</label><input type="file" id="historyImportFile" accept=".csv,.json"><p class="muted">可下载 CSV 模板填写报价明细，Excel 文件请另存为 UTF-8 CSV。也支持结构化 JSON 格式，单份最多20 MB。</p></div><button type="button" class="btn-ghost" id="historyTemplate">下载 CSV 模板</button><div id="historyImportPreview" role="status"><p class="muted">选择文件后先预览，不会直接写入产品或报价。</p></div></div>`, { plain: true, wide: true, noFooter: true });
+  openModal('导入报价数据', `<div class="catalog-detail"><div class="field"><label>选择报价数据文件（CSV / JSON）</label><input type="file" id="historyImportFile" accept=".csv,.json"><p class="muted">可下载 CSV 模板填写报价明细，Excel 文件请另存为 UTF-8 CSV。支持原知识库的 JSON 数据格式，单份最多20 MB。</p></div><button type="button" class="btn-ghost" id="historyTemplate">下载 CSV 模板</button><div id="historyImportPreview" role="status"><p class="muted">选择文件后先预览，不会直接写入产品或报价。</p></div></div>`, { plain: true, wide: true, noFooter: true });
   const form = document.getElementById('modalForm'), host = form.querySelector('#historyImportPreview'); let sequence = 0;
   form.querySelector('#historyTemplate').onclick = async () => {
     try {

@@ -53,8 +53,8 @@ test('business permissions: roles, modules, aggregation, attachments and direct 
   await json('PUT','/api/clients/'+other.clients.id,manager,{owner:outsider.id});
  });
  await t.test('dashboard isolation and removed dedup endpoint',async()=>{
-  await json('PUT','/api/inquiries/'+own.inquiries.id,sales,{status:'已报价',expectedAmount:10});
-  await json('PUT','/api/inquiries/'+other.inquiries.id,manager,{status:'已报价',expectedAmount:900});
+  await json('PUT','/api/inquiries/'+own.inquiries.id,sales,{status:'已报价',expectedAmount:10,lastStageReason:'测试报价进度'});
+  await json('PUT','/api/inquiries/'+other.inquiries.id,manager,{status:'已报价',expectedAmount:900,lastStageReason:'测试报价进度'});
   assert.equal((await json('GET','/api/dashboard/summary',sales)).cards.canQuote.amount,10);
   assert.equal((await json('GET','/api/dashboard/summary',manager)).cards.canQuote.amount,910);
   assert.equal((await req('GET','/api/dedup/preview',sales)).status,404);

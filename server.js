@@ -13,9 +13,12 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 // 数据访问层（MySQL / JSON 双后端，2026-08-21 升级）。对外 readJson/writeJson 签名不变，底层按 STORAGE_MODE 切换。
 import * as dal from './db/dal.js';
-import {normalizeSalesFields, createQuote, reviseQuote} from './sales-records.js';
+import {mergeQuoteVersions} from './quote-version-merge.js';
+import {sameCustomer, reconcileInquiries, provisionQuoteInquiry} from './inquiry-link.js';
+import {normalizeSalesFields, createQuote, reviseQuote, quoteNumberKey} from './sales-records.js';
 import { createCatalogRoutes } from './catalog-routes.js';
 import { createCatalogStore } from './catalog-store.js';
+import { createInquiryIntakeRoutes } from './inquiry-intake.js';
 import { quoteProductLines, visibleHistory } from './product-catalog.js';
 // AI 管家编排层（2026-08-26 P0）：工具协议 + 查询工具服务端执行；写动作返回前端确认后走现有 REST（继承 RBAC/审计）
 import { handleAiAgent } from './ai-agent.js';
@@ -64,7 +67,15 @@ const BACKUP_KEEP = 30; // 每个数据文件保留最近 30 份历史版本
 const PORT = process.env.PORT || 4173;
 // 存储后端：'mysql' 或 'json'。由 ensureStore() 调用 dal.initDAL() 后确定（MySQL 不可用时自动降级 'json'）。
 let STORAGE_MODE = 'json';
+const quoteVersionStore=createCatalogStore({dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal,mode:()=>STORAGE_MODE,journalName:'quote-version-merge-journal.json',mysqlCommit:'commitQuoteVersionMerge'});
+const quoteInquiryStore=createCatalogStore({dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal,mode:()=>STORAGE_MODE,journalName:'quote-inquiry-write-journal.json',mysqlCommit:'commitQuoteInquiry'});
 const catalogStore = createCatalogStore({ dataDir: DATA_DIR, read: readJson, write: writeJson, jsonRead, jsonWrite, dal, mode: () => STORAGE_MODE });
+const inquiryIntakeStore = createCatalogStore({ dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal:{commitCatalog:dal.commitInquiryIntake},mode:()=>STORAGE_MODE,journalName:'inquiry-intake-write-journal.json' });
+const inquiryIntakeRoutes = createInquiryIntakeRoutes({
+  read:base=>readJson(path.join(DATA_DIR,base+'.json'),[]),
+  write:(base,rows)=>writeJson(path.join(DATA_DIR,base+'.json'),rows),
+  commit:inquiryIntakeStore.commit,body:readBody,send:sendJson,users:()=>readUsers().users,audit:logAudit,
+});
 const catalogRoutes = createCatalogRoutes({ root: __dirname,
   read: base => readJson(path.join(DATA_DIR, base + '.json'), []),
   write: (base, rows) => writeJson(path.join(DATA_DIR, base + '.json'), rows),
@@ -115,6 +126,7 @@ function loadSecret() {
     return s;
   }
 }
+fs.mkdirSync(DATA_DIR, { recursive: true });
 const SECRET = loadSecret();
 
 // ---------- 密码哈希（scrypt + 盐） ----------
@@ -636,6 +648,8 @@ async function canReadUpload(user, urlPath) {
   if (!user) return false;
   if (isBusinessManager(user)) return true;
   if (urlPath.startsWith('/uploads/suppliers/')) return true;
+  const categoryImages = await readJson(path.join(DATA_DIR, 'product-category-settings.json'), []);
+  if (categoryImages.some(item => item.image === urlPath)) return true;
   let referenced = false;
   for (const file of [CLIENTS_FILE, INQ_FILE, ORDERS_FILE, QUOTATIONS_FILE, SHIP_FILE, EXC_FILE, FIN_FILE, COMM_FILE, EMAILS_FILE, TASKS_FILE, CONTACTS_FILE, CHATS_FILE, KNOWLEDGE_FILE, PRODUCTS_FILE, SUPP_FILE, CTMPL_FILE]) {
     const shared = [PRODUCTS_FILE, SUPP_FILE, CTMPL_FILE].includes(file);
@@ -829,7 +843,8 @@ async function validateBusinessBody(req, body) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw permissionError('记录格式错误', 400);
     if ('owner' in value) Object.assign(value, ownerFields(value, user));
     else delete value.ownerName; // 姓名由服务端根据账号确定，不能伪造
-    delete value.id; delete value.createdAt; delete value.updatedAt;
+    delete value.id; delete value.createdAt; delete value.updatedAt;delete value.originQuoteId;
+    if(new URL(req.url,'http://local').pathname.startsWith('/api/clients')&&value.source==='报价建档')value.source='阿里巴巴';
     for (const [key, file] of [['clientId', CLIENTS_FILE], ['inquiryId', INQ_FILE], ['orderId', ORDERS_FILE], ['quotationId', QUOTATIONS_FILE], ['quoteId', QUOTATIONS_FILE]]) {
       if (!value[key]) continue;
       const target = (await readJson(file)).find(row => row.id === value[key]);
@@ -846,6 +861,60 @@ async function validateBusinessBody(req, body) {
 async function unmarkPrimary(list, clientId, exceptId, user) {
   if (!clientId) return;
   for (const c of list) if (c.clientId === clientId && c.id !== exceptId && c.isPrimary && canAccessRecord(user, c.owner)) c.isPrimary = false;
+}
+
+async function validateInquiryLink(record,user,kind){
+ const inqs=await readJson(INQ_FILE),quotes=await readJson(QUOTATIONS_FILE);
+ const quote=kind==='order'&&record.quoteId?quotes.find(q=>q.id===record.quoteId):null;
+ if(quote?.inquiryId&&!record.inquiryId)record.inquiryId=quote.inquiryId;
+ if(quote&&record.inquiryId&&quote.inquiryId&&quote.inquiryId!==record.inquiryId)throw permissionError('订单来源询盘与关联报价不一致',400);
+ if(kind==='quote'&&record.inquiryId){const orders=await readJson(ORDERS_FILE);if(orders.some(o=>o.quoteId===record.id&&o.inquiryId&&o.inquiryId!==record.inquiryId))throw permissionError('此报价的关联订单已指定其他来源询盘，请先核对订单关联',400);}
+ if(!record.inquiryId)return record;
+ const target=inqs.find(q=>q.id===record.inquiryId);
+ if(!target||!canAccessRecord(user,target.owner))throw permissionError('无权限关联该询盘');
+ if(!sameCustomer(record,target))throw permissionError('所选询盘与当前客户不一致，请重新选择',400);
+ return record;
+}
+async function syncInquiryStages(user){
+ const inqs=await readJson(INQ_FILE),quotes=await readJson(QUOTATIONS_FILE),orders=await readJson(ORDERS_FILE);
+ const result=reconcileInquiries(inqs,quotes,orders,{actor:user?.name||'系统联动',canAccess:user?r=>canAccessRecord(user,r.owner):()=>true});
+ if(result.changed.length){
+  if(!user){const backupDir=path.join(DATA_DIR,'backups');await fsp.mkdir(backupDir,{recursive:true});await fsp.writeFile(path.join(backupDir,'inquiry-links-before-'+Date.now()+'.json'),JSON.stringify(inqs,null,2),{mode:0o600});}
+  await writeJson(INQ_FILE,result.inquiries);
+ }
+ return result.changed;
+}
+
+async function saveQuoteOpportunity(quotes,quote,user){
+ const inqs=await readJson(INQ_FILE),orders=await readJson(ORDERS_FILE),now=Date.now();
+ const provision=provisionQuoteInquiry(quote,inqs,{now,id:genId(),actor:user?.name||'系统联动'});
+ if(provision.created){
+  const client=(await readJson(CLIENTS_FILE)).find(c=>c.id===quote.clientId);
+  if(client)for(const key of ['country','contactName','contactEmail','contactPhone'])if(!provision.created[key])provision.created[key]=client[key]||'';
+  inqs.push(provision.created);
+ }
+ const synced=reconcileInquiries(inqs,quotes,orders,{now,actor:user?.name||'系统联动',canAccess:r=>canAccessRecord(user,r.owner)});
+ await quoteInquiryStore.commit({quotations:quotes,inquiries:synced.inquiries});
+}
+
+async function migrateDuplicateQuoteVersions(){
+ const quotations=await readJson(QUOTATIONS_FILE),inquiries=await readJson(INQ_FILE),orders=await readJson(ORDERS_FILE);
+ const related={exceptions:await readJson(EXC_FILE),tasks:await readJson(TASKS_FILE)};
+ const result=mergeQuoteVersions(quotations,inquiries,orders,{related});
+ if(result.merged.length){const dir=path.join(DATA_DIR,'backups');await fsp.mkdir(dir,{recursive:true});await fsp.writeFile(path.join(dir,'quote-versions-before-'+Date.now()+'.json'),JSON.stringify({quotations,inquiries,orders,related,plan:result.merged},null,2),{mode:0o600});await quoteVersionStore.commit({quotations:result.quotations,inquiries:result.inquiries,orders:result.orders,...result.related});}
+ return {merged:result.merged.length,skipped:result.skipped.length};
+}
+
+async function migrateQuoteClientSources(){
+ const clients=await readJson(CLIENTS_FILE),changed=clients.filter(c=>c.source==='报价建档');if(!changed.length)return 0;
+ const dir=path.join(DATA_DIR,'backups');await fsp.mkdir(dir,{recursive:true});await fsp.writeFile(path.join(dir,'quote-client-source-before-'+Date.now()+'.json'),JSON.stringify(changed,null,2),{mode:0o600});
+ for(const client of changed){client.source='阿里巴巴';client.updatedAt=Date.now();}
+ await writeJson(CLIENTS_FILE,clients);return changed.length;
+}
+async function validateInquiryCustomer(next){
+ const quotes=await readJson(QUOTATIONS_FILE),orders=await readJson(ORDERS_FILE),quoteIds=new Set(quotes.filter(q=>q.inquiryId===next.id).map(q=>q.id));
+ const linked=[...quotes.filter(q=>q.inquiryId===next.id),...orders.filter(o=>o.inquiryId===next.id||quoteIds.has(o.quoteId))];
+ if(linked.some(r=>!sameCustomer(next,r)))throw permissionError('此询盘已有关联业务，请先核对关联报价和订单的客户再修改客户档案',400);
 }
 
 // ---------- 操作审计日志 ----------
@@ -1085,7 +1154,7 @@ async function listSuppFiles(s) {
 // 需要串行执行的写接口：它们都是"读全表 → 改一条 → 写回全表"，并发跑会丢更新
 // （两个人同时改客户，后写的会把先写的整份覆盖掉）。这类操作只是本地毫秒级读写，
 // 排队不影响体验；AI 对话、邮件收发、汇率等耗时接口刻意不入队，避免相互阻塞。
-const WRITE_LOCK_PATHS = /^\/api\/(clients|orders|inquiries|shipments|products|emails|comms|comm-templates|suppliers|finance|exceptions|sales|settings|users|tasks|contacts|chats|webhook|quotations|knowledge|notifications|system-notices|announcement|crm-imports|upload|mail|ai)\b/;
+const WRITE_LOCK_PATHS = /^\/api\/(clients|orders|inquiries|inquiry-drafts|inquiry-mcp|inquiry-mcp-tokens|shipments|products|emails|comms|comm-templates|suppliers|finance|exceptions|sales|settings|users|tasks|contacts|chats|webhook|quotations|knowledge|notifications|system-notices|announcement|crm-imports|upload|mail|ai)\b/;
 let writeChain = Promise.resolve();
 function serializeWrite(fn) {
   const next = writeChain.then(fn, fn);
@@ -1202,9 +1271,11 @@ async function handleRequest(req, res, url, p, method) {
     }
 
     // ---------- 鉴权：其余 API 必须登录 ----------
+    if(p.startsWith('/api/inquiry-mcp/')&&await inquiryIntakeRoutes(req,res,url,p,method))return;
     const user = getCurrentUser(req);
     if (p.startsWith('/api/') && !user) return sendJson(res, 401, { error: '未登录' });
     req.user = user;
+    if(await inquiryIntakeRoutes(req,res,url,p,method,user))return;
     if (await catalogRoutes(req, res, url, p, method, user)) return;
 
     // ---------- 文件上传（base64 编码，前端用 FileReader 读取后提交） ----------
@@ -1501,7 +1572,7 @@ async function handleRequest(req, res, url, p, method) {
       const matches = visibleRecords(list, user).filter(c => normalize(c.company) === normalize(company));
       const existing = matches.find(c => c.owner === (body.owner || user.id)) || matches[0];
       if (existing) return sendJson(res, 200, { client: existing, created: false });
-      const fields = { company, stage: '潜在', source: '报价建档' };
+      const fields = { company, stage: '潜在', source: '阿里巴巴' };
       for (const key of ['contactName', 'country', 'contactEmail', 'contactPhone', 'website']) fields[key] = String(body[key] || '').trim().slice(0, 500);
       const now = Date.now();
       const client = { ...withOwner({ ...fields, owner: body.owner || user.id }, user), id: genId(), createdAt: now, updatedAt: now };
@@ -1580,7 +1651,7 @@ async function handleRequest(req, res, url, p, method) {
         patch.owner = target.id; patch.ownerName = target.name || '';
       }
       if (Object.keys(patch).length === 1) return sendJson(res, 400, {error:'请选择修改字段'});
-      if (STORAGE_MODE === 'mysql') return sendJson(res, 200, await dal.patchOrders(ids, patch, owner => canAccessRecord(user, owner)));
+      if (STORAGE_MODE === 'mysql') {const result=await dal.patchOrders(ids,patch,owner=>canAccessRecord(user,owner));await syncInquiryStages(user);return sendJson(res,200,result);}
       const list = await readJson(ORDERS_FILE), succeeded = [], failed = [];
       for (const id of ids) {
         const row = list.find(o => o.id === id);
@@ -1588,7 +1659,7 @@ async function handleRequest(req, res, url, p, method) {
         else if (!canAccessRecord(user,row.owner)) failed.push({id,reason:'无修改权限'});
         else { Object.assign(row,patch); succeeded.push(id); }
       }
-      if (succeeded.length) await writeJson(ORDERS_FILE,list);
+      if (succeeded.length) {await writeJson(ORDERS_FILE,list);await syncInquiryStages(user);}
       return sendJson(res,200,{succeeded,failed,patch});
     }
 
@@ -1605,8 +1676,10 @@ async function handleRequest(req, res, url, p, method) {
         const list = await readJson(ORDERS_FILE);
         const now = Date.now();
         const item = { id: genId(), createdAt: now, updatedAt: now, ...withOwner(body, user) };
+        await validateInquiryLink(item,user,'order');
         list.push(item);
         await writeJson(ORDERS_FILE, list);
+        await syncInquiryStages(user);
         return sendJson(res, 201, item);
       }
     }
@@ -1619,12 +1692,16 @@ async function handleRequest(req, res, url, p, method) {
       if (method === 'DELETE') {
         list.splice(idx, 1);
         await writeJson(ORDERS_FILE, list);
+        await syncInquiryStages(user);
         return sendJson(res, 200, { ok: true });
       }
       let body = await readBody(req);
         try { body = normalizeSalesFields(body); } catch (error) { return sendJson(res,400,{error:error.message}); }
-      list[idx] = { ...list[idx], ...body, id: om[1], updatedAt: Date.now() };
+      const nextOrder={...list[idx],...body,id:om[1],updatedAt:Date.now()};
+      await validateInquiryLink(nextOrder,user,'order');
+      list[idx]=nextOrder;
       await writeJson(ORDERS_FILE, list);
+      await syncInquiryStages(user);
       return sendJson(res, 200, list[idx]);
     }
 
@@ -1639,11 +1716,22 @@ async function handleRequest(req, res, url, p, method) {
         const body = await readBody(req);
         const list = await readJson(QUOTATIONS_FILE);
         const now = Date.now();
+        const number=quoteNumberKey(body.quoteNo),sameNumber=number?visibleRecords(list,user).filter(q=>quoteNumberKey(q.quoteNo)===number):[];
+        const matches=sameNumber.filter(q=>sameCustomer(q,body));
+        if(matches.length>1)return sendJson(res,409,{error:'该编号存在多份报价，请先核对并合并重复记录'});
+        if(sameNumber.length&&!matches.length)return sendJson(res,409,{error:'该报价编号已属于其他客户，请核对客户或修改报价编号'});
         let item;
-        try { item = createQuote(withOwner(await enrichQuoteCatalog(body, user),user),user,now,genId()); } catch(error) { return sendJson(res,error.status || 400,{error:error.message}); }
-        list.push(item);
-        await writeJson(QUOTATIONS_FILE, list);
-        return sendJson(res, 201, item);
+        if(matches.length){
+          const previous=matches[0],patch={...body,quoteNo:previous.quoteNo,owner:previous.owner,ownerName:previous.ownerName};
+          for(const key of Object.keys(patch))if(patch[key]==null||patch[key]==='')delete patch[key];
+          try{item=reviseQuote(previous,await enrichQuoteCatalog(patch,user,previous),user,now);}catch(error){return sendJson(res,error.status||400,{error:error.message});}
+          await validateInquiryLink(item,user,'quote');list[list.findIndex(q=>q.id===previous.id)]=item;
+        }else{
+          try { item = createQuote(withOwner(await enrichQuoteCatalog(body, user),user),user,now,genId()); } catch(error) { return sendJson(res,error.status || 400,{error:error.message}); }
+          await validateInquiryLink(item,user,'quote');list.push(item);
+        }
+        await saveQuoteOpportunity(list,item,user);
+        return sendJson(res, matches.length?200:201, item);
       }
     }
     const qm = p.match(/^\/api\/quotations\/([\w-]+)$/);
@@ -1655,12 +1743,16 @@ async function handleRequest(req, res, url, p, method) {
       if (method === 'DELETE') {
         list.splice(idx, 1);
         await writeJson(QUOTATIONS_FILE, list);
+        await syncInquiryStages(user);
         return sendJson(res, 200, { ok: true });
       }
       const body = await readBody(req);
+      if(body.quoteNo&&quoteNumberKey(body.quoteNo)===quoteNumberKey(list[idx].quoteNo))body.quoteNo=list[idx].quoteNo;
+      if(body.quoteNo&&list.some(q=>q.id!==qm[1]&&canAccessRecord(user,q.owner)&&quoteNumberKey(q.quoteNo)===quoteNumberKey(body.quoteNo)&&sameCustomer(q,{...list[idx],...body})))return sendJson(res,409,{error:'该编号已存在，请打开原报价更新内容'});
       try { list[idx] = reviseQuote(list[idx],await enrichQuoteCatalog(body,user,list[idx]),user,Date.now()); }
       catch(error) { return sendJson(res,error.status||400,{error:error.message}); }
-      await writeJson(QUOTATIONS_FILE, list);
+      await validateInquiryLink(list[idx],user,'quote');
+      await saveQuoteOpportunity(list,list[idx],user);
       return sendJson(res, 200, list[idx]);
     }
 
@@ -1686,6 +1778,21 @@ async function handleRequest(req, res, url, p, method) {
       }
       if (added > 0) await writeJson(file, list);
       return sendJson(res, 201, { added, skipped });
+    }
+
+    if(p==='/api/inquiries/reconcile'&&method==='POST')return sendJson(res,200,{changed:await syncInquiryStages(user)});
+
+    const followMatch=p.match(/^\/api\/inquiries\/([\w-]+)\/followups$/);
+    if(followMatch&&method==='POST'){
+      const list=await readJson(INQ_FILE),idx=list.findIndex(q=>q.id===followMatch[1]);
+      if(idx<0)return sendJson(res,404,{error:'询盘不存在'});
+      if(!canAccessRecord(user,list[idx].owner))return sendJson(res,403,{error:'无权限操作该询盘'});
+      const body=await readBody(req),content=typeof body.content==='string'?body.content.trim():'';
+      if(!content||content.length>8000)return sendJson(res,400,{error:'跟进内容不能为空，最多 8000 字'});
+      if('nextFollowAt' in body){const date=body.nextFollowAt;if(typeof date!=='string'||(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date)))return sendJson(res,400,{error:'下次跟进日期无效'});}
+      const now=Date.now(),previous=list[idx],entry={id:genId(),content,at:now,by:user.name||user.username,userId:user.id,...('nextFollowAt' in body?{nextFollowAt:body.nextFollowAt}:{})};
+      list[idx]={...previous,followLog:[...(Array.isArray(previous.followLog)?previous.followLog:[]),entry],lastFollowAt:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now)),updatedAt:now,...('nextFollowAt' in body?{nextFollowAt:body.nextFollowAt}:{})};
+      await writeJson(INQ_FILE,list);return sendJson(res,201,list[idx]);
     }
 
     // 询盘 CRUD（统一业务归属权限）
@@ -1720,7 +1827,21 @@ async function handleRequest(req, res, url, p, method) {
         return sendJson(res, 200, { ok: true });
       }
       const body = await readBody(req);
-      list[idx] = { ...list[idx], ...body, id: im[1], updatedAt: Date.now() };
+      const previous=list[idx],now=Date.now(),oldStatus=previous.status||'新询盘';
+      // History is appended to the current server record; a stale editor cannot replace it.
+      delete body.stageLog;delete body.wonAt;delete body.followLog;
+      const reason=typeof body.lastStageReason==='string'?body.lastStageReason.trim():'';
+      delete body.lastStageReason;
+      if('status' in body&&body.status!==oldStatus){
+        if(!['新询盘','已报价','等回复','谈判中','成交','输单','暂缓','无效'].includes(body.status))return sendJson(res,400,{error:'无效询盘状态'});
+        if(!reason)return sendJson(res,400,{error:'请填写阶段变更原因'});
+        body.lastStageReason=reason;
+        body.stageLog=[...(Array.isArray(previous.stageLog)?previous.stageLog:[]),{from:oldStatus,to:body.status,reason,at:now,by:user.name||user.username,automatic:false}];
+        if(body.status==='成交')body.wonAt=previous.wonAt||now;
+      }
+      const nextInquiry={...previous,...body,id:im[1],updatedAt:now};
+      if('clientId' in body||'clientName' in body)await validateInquiryCustomer(nextInquiry);
+      list[idx]=nextInquiry;
       await writeJson(INQ_FILE, list);
       return sendJson(res, 200, list[idx]);
     }
@@ -2696,8 +2817,17 @@ async function handleRequest(req, res, url, p, method) {
 releaseNotice = await createReleaseNotice(__dirname);
 await ensureStore();
 await catalogStore.recover();
+await quoteInquiryStore.recover();
+await quoteVersionStore.recover();
+await inquiryIntakeStore.recover();
 await migrateContacts();
 await dailySnapshot();
+const quoteVersionUpdates=await migrateDuplicateQuoteVersions();
+if(quoteVersionUpdates.merged||quoteVersionUpdates.skipped)console.log('[quote-versions]',JSON.stringify(quoteVersionUpdates));
+const clientSourceUpdates=await migrateQuoteClientSources();
+if(clientSourceUpdates)console.log('[client-source] 报价建档来源已更正:',clientSourceUpdates);
+const inquiryLinkUpdates=await syncInquiryStages();
+if(inquiryLinkUpdates.length)console.log("[inquiry-links] 已同步明确关联的询盘:",inquiryLinkUpdates.length);
 server.listen(PORT, () => {
   console.log(`外贸CRM系统已启动: http://localhost:${PORT}`);
   console.log(`数据目录: ${DATA_DIR}`);

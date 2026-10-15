@@ -125,6 +125,9 @@ let clientFollowFilter = false; // 仪表盘「待跟进客户」卡片跳转后
 let currentClientId = null;     // 客户 360° 详情页当前客户 ID
 const VALID_VIEWS = ['dashboard', 'clients', 'orders', 'enquiry', 'quotations', 'docs', 'performance', 'emails', 'products', 'shipments', 'suppliers', 'finance', 'comms', 'chatlog', 'mail', 'calc', 'settings', 'audit', 'tasks', 'reports', 'inqstats', 'client-detail', 'order-detail', 'reminders', 'knowledge'];
 
+// 暂停两个独立模块及沟通子页；保留客户档案和 AI 使用的记录、接口与共用逻辑。
+const HIDDEN_STANDALONE_VIEWS = new Set(['emails', 'comms', 'chatlog', 'mail']);
+
 // 进入首页时自动刷新：先用内存数据立即重绘，再拉最新数据重绘一次。
 // 节流只用来挡住「快速连点导航」造成的抖动（1.2 秒）；正常进首页一定会重新拉数据。
 let dashLastReload = 0;
@@ -142,6 +145,10 @@ function refreshDashboardOnEnter() {
 
 function activateView(view) {
   if(view.startsWith('order-detail?')){window.salesSelectedOrder=new URLSearchParams(view.split('?')[1]).get('id');view='order-detail';}
+  if (HIDDEN_STANDALONE_VIEWS.has(view.split('?')[0])) {
+    history.replaceState(null, '', '#/dashboard');
+    view = 'dashboard';
+  }
   if (view === 'tools') {
     history.replaceState(null, '', '#/dashboard');
     view = 'dashboard';
@@ -241,7 +248,7 @@ function bindTopbar() {
     if (old) { old.remove(); return; }
     const menu = document.createElement('div');
     menu.id = 'quickCreateMenu'; menu.className = 'quick-create-menu';
-    menu.innerHTML = '<button data-create="client">客户</button><button data-create="inquiry">询盘</button><button data-create="order">订单</button><button data-create="task">任务</button><button data-create="comm">沟通记录</button>';
+    menu.innerHTML = '<button data-create="client">客户</button><button data-create="inquiry">询盘</button><button data-create="order">订单</button><button data-create="task">任务</button>';
     create.parentElement.appendChild(menu);
     menu.querySelectorAll('[data-create]').forEach((b) => b.onclick = () => {
       menu.remove();
@@ -249,7 +256,6 @@ function bindTopbar() {
       else if (b.dataset.create === 'inquiry' && typeof openInqModal === 'function') openInqModal();
       else if (b.dataset.create === 'order') openOrderModal();
       else if (b.dataset.create === 'task' && typeof window.openTaskModal === 'function') window.openTaskModal();
-      else if (b.dataset.create === 'comm' && typeof window.openCommModal === 'function') window.openCommModal();
     });
   };
   const gs = $('#globalSearch');
@@ -3424,11 +3430,13 @@ function openOrderModal(id, prefill) {
     ${field('交期', 'deliveryDate', o.deliveryDate, 'date')}
     ${field('付款方式', 'paymentTerms', o.paymentTerms)}
     ${salesOrderFields(o)}
+    ${inquirySelectorHtml(o.inquiryId,'order')}
     <div class="field"><label>责任人</label><select name="owner">${ownerOpts}</select></div>
     <section class="field full order-items-editor"><div class="items-head"><b>产品明细</b><button type="button" class="btn-mini" id="oiAdd">+ 添加产品</button></div><div id="oiRows"></div><div class="items-head"><span id="oiTotal"></span><button type="button" class="btn-mini" id="oiUseTotal">用明细合计填入订单金额</button></div></section>
     <div class="field full"><label>备注</label><textarea name="notes">${esc(o.notes)}</textarea></div>
   `, {wide:true});
   bindSalesPercentControls($('#modalForm'));
+  bindInquirySelector($('#modalForm'),o);
   const itemEditor = bindOrderItems(o);
   // 选中客户后，自动从客户档案填充所有可对应的订单字段，并展示联系方式供确认
   const form = $('#modalForm');

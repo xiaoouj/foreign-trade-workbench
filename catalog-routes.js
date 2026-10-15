@@ -1,17 +1,15 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { uploadedQuoteSource } from './catalog-upload.js';
-import { isCatalogManager, key, planImport, visibleHistory, paged, publicHistoryRow, filterHistory, priceGroups, completeness, validateProduct } from './product-catalog.js';
+import { SOURCE_URL, isCatalogManager, key, prepareSource, planImport, visibleHistory, paged, publicHistoryRow, filterHistory, priceGroups, completeness, validateProduct } from './product-catalog.js';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const facets = (rows, fields) => Object.fromEntries(fields.map(field => [field, [...new Set(rows.map(r => r[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'))]));
 const defaultCategoryImage = category => /滚筒/.test(category) ? '/category-images/roller-conveyor.png' : /配件.*(?:轴承|齿轮|电机)/.test(category) ? '/category-images/mechanical-parts.png' : '';
 export function createCatalogRoutes({ root, read, write, commit, body, send, audit }) {
-  const importTemplate = {
-    sourceColumns: ['设备/物料名称','型号/规格','设备品类','客户','路径','单价','日期','洲','国家','资料类别','币种','贸易条款','金额','数量','单位','备注','来源文件','报价单号','有效期','付款方式','交期'],
-    documentColumns: ['报价单号','日期','洲','国家','客户','资料类别','币种','贸易条款','单据总额','有效期','付款方式','交期','文件','路径']
-  };
-  const source = async () => { throw Object.assign(new Error('请上传 CSV 或 JSON 格式的历史报价数据'), { status: 503 }); };
+  let sourcePromise;
+  const source = () => sourcePromise ||= readFile(path.join(process.env.FTW_IMPORT_SOURCE_DIR || path.join(root, 'import-source'), 'quote-knowledge.json'), 'utf8').then(text => prepareSource(JSON.parse(text))).catch(e => { sourcePromise = null; throw Object.assign(new Error('历史报价来源文件未安装或格式错误：' + e.message), { status: 503 }); });
   const manager = user => { if (!isCatalogManager(user)) fail('需要管理员或经理权限', 403); };
   async function historyFor(user) { return visibleHistory(await read('product-history'), user, await read('clients')); }
   return async function route(req, res, url, p, method, user) {
@@ -76,24 +74,25 @@ export function createCatalogRoutes({ root, read, write, commit, body, send, aud
       return reply(200, batches.map(({ sourceColumns, documentColumns, ...record }) => record).sort((a, b) => b.importedAt - a.importedAt));
     }
     if (p === '/api/products/import-template' && method === 'GET') {
-      manager(user); return reply(200, { columns: importTemplate.sourceColumns });
+      manager(user); const s = await source();
+      return reply(200, { columns: s.sourceColumns });
     }
     if (p === '/api/products/import-preview' && ['GET', 'POST'].includes(method)) {
       manager(user); const upload = method === 'POST' ? await body(req) : null;
-      const s = upload ? uploadedQuoteSource(upload, importTemplate) : await source();
+      const s = upload ? uploadedQuoteSource(upload, await source()) : await source();
       const history = await read('product-history'), plan = planImport(s, all, history, user);
-      return reply(200, { batchId: s.batchId, counts: plan.counts, documents: s.docs.length, samples: plan.additions.slice(0, 12), sourceUrl: '', filename: s.filename || '报价数据', sourceGeneratedDate: '' });
+      return reply(200, { batchId: s.batchId, counts: plan.counts, documents: s.docs.length, samples: plan.additions.slice(0, 12), sourceUrl: upload ? '' : SOURCE_URL, filename: s.filename || '历史报价导入', sourceGeneratedDate: '' });
     }
     if (p === '/api/products/import-history' && method === 'POST') {
       manager(user); const input = await body(req);
-      const s = input.upload ? uploadedQuoteSource(input.upload, importTemplate) : await source();
+      const s = input.upload ? uploadedQuoteSource(input.upload, await source()) : await source();
       if (input.batchId !== s.batchId) fail('来源已变化，请重新预览', 409);
       const history = await read('product-history'), documents = await read('product-documents'), batches = await read('product-imports');
       const plan = planImport(s, all, history, user), oldIds = new Set(history.map(r => r.id)), oldDocs = new Set(documents.map(d => d.id));
       const additions = plan.rows.filter(r => !oldIds.has(r.id));
       if (!additions.length && s.docs.every(d => oldDocs.has(d.id))) return reply(200, { imported: false, counts: plan.counts, batchId: s.batchId });
       const now = Date.now();
-      const batch = { id: s.batchId, sourceUrl: '', filename: s.filename || '报价数据', format: input.upload.format, sourceGeneratedDate: '', importedAt: now, importedBy: user.id, importedByName: user.name, sourceColumns: s.sourceColumns, documentColumns: s.documentColumns, counts: plan.counts, documents: s.docs.length };
+      const batch = { id: s.batchId, sourceUrl: input.upload ? '' : SOURCE_URL, filename: s.filename || '历史报价导入', format: input.upload?.format || 'workbuddy', sourceGeneratedDate: '', importedAt: now, importedBy: user.id, importedByName: user.name, sourceColumns: s.sourceColumns, documentColumns: s.documentColumns, counts: plan.counts, documents: s.docs.length };
       await commit({ products: [...all, ...plan.additions], 'product-history': [...history, ...additions], 'product-documents': [...documents, ...s.docs.filter(d => !oldDocs.has(d.id)).map(d => ({ ...d, owner: user.id, ownerName: user.name }))], 'product-imports': [...batches.filter(b => b.id !== s.batchId), batch] });
       audit(user, 'create', 'products', s.batchId, '历史报价导入：' + plan.counts.created + ' 个产品，' + additions.length + ' 条明细');
       return reply(201, { imported: true, counts: plan.counts, batchId: s.batchId });

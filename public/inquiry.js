@@ -41,11 +41,12 @@ function inqFilteredAll(list) {
   const cf = String(window.inqClientFilter || '').trim().toLowerCase();
   if (cf) out = out.filter((q) => String(q.clientName || '').trim().toLowerCase() === cf);
   if (inqOwnerFilterQ) out = out.filter((q) => String(q.ownerName || q.owner || '') === inqOwnerFilterQ);
-  return out;
+  return typeof inqWorkspaceFilter==='function'?inqWorkspaceFilter(out):out;
 }
 
 // 过滤条：显示当前生效的客户/责任人过滤，可一键清除
 function renderInqFilterBar() {
+  if(typeof renderInqActiveFilters==='function'){renderInqActiveFilters();return;}
   const view = document.getElementById('view-enquiry');
   if (!view) return;
   let bar = document.getElementById('inqFilterBar');
@@ -80,6 +81,7 @@ $$('#view-enquiry .subtab').forEach((b) => b.addEventListener('click', () => {
   if (b.dataset.subtab === 'stats') renderInqStats();
   if (b.dataset.subtab === 'exception') renderExceptions();
   if (b.dataset.subtab === 'list') renderInqList();
+  window.dispatchEvent(new CustomEvent('ftw:inqViewChanged',{detail:b.dataset.subtab}));
 }));
 
 // 搜索
@@ -159,8 +161,9 @@ function renderInqBoard() {
     el.addEventListener('dragend', () => { el.style.opacity = ''; });
     el.addEventListener('click', (e) => {
       const link = e.target.closest('.link-name');
-      if (link) { e.preventDefault(); window.openClientDetailByName(link.dataset.detailName); return; }
-      openInqModal(el.dataset.id);
+      if (link) { e.preventDefault(); openInqDetail(el.dataset.id); return; }
+      const linkButton=e.target.closest('[data-inq-links]');if(linkButton){e.stopPropagation();openInquiryLinks(linkButton.dataset.inqLinks);return;}
+      openInqDetail(el.dataset.id);
     });
   });
   wrap.querySelectorAll('.kanban-cards').forEach((col) => {
@@ -192,11 +195,6 @@ async function changeInqStatus(id, newStatus, opts = {}) {
   try {
     const now = Date.now();
     const body = { status: newStatus, updatedAt: now, lastStageReason: reason };
-    body.stageLog = (item.stageLog || []).concat([{
-      from: oldStatus, to: newStatus, reason, at: now,
-      by: (typeof currentUser !== 'undefined' && currentUser) ? (currentUser.name || currentUser.username) : '系统',
-    }]);
-    if (newStatus === '成交') body.wonAt = now;
     const r = await api('/api/inquiries/' + id, { method: 'PUT', body: JSON.stringify(body) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); toast(j.error || '状态更新失败'); if (opts.resetEl) opts.resetEl(oldStatus); return false; }
     toast(`已移至「${newStatus}」`);
@@ -226,6 +224,8 @@ function cardHtml(q) {
   return `<div class="kc" data-id="${q.id}">
     <div class="kco"><a class="link-name" data-detail-name="${esc(displayClientName(q))}" title="查看客户详情">${esc(displayClientName(q))}</a></div>
     <div class="kmeta">${esc(q.country || '')} · ${esc(q.product || '—')}</div>
+    ${inquiryLinkSummary(q)}
+    ${q.lastStageReason?`<div class="inq-latest-reason" title="${esc(q.lastStageReason)}">变更原因：${esc(q.lastStageReason)}</div>`:''}
     <div class="kfoot">
       <span class="kamt">${amt}</span>
       <span class="kflag">${esc(q.status || '新询盘')}</span>
@@ -257,48 +257,7 @@ function fmtDateShort(s) {
 // 列表筛选由顶部搜索框驱动（分级筛选条已移除，分类统一用 status）
 
 function renderInqList() {
-  const body = $('#inqListBody');
-  renderInqFilterBar();
-  let list = inqSearch(inqFilteredAll(inquiries));
-  // 仪表盘「待跟进询盘」跳转过来的筛选
-  const isFollowFilter = window.inqFollowFilter;
-  if (isFollowFilter) {
-    const today = new Date().toISOString().slice(0, 10);
-    list = list.filter((q) => {
-      if (!q.nextFollowAt || q.nextFollowAt > today) return false;
-      return canSeeBusiness(q.owner);
-    });
-    window.inqFollowFilter = false;
-  }
-  list.sort((a,b)=>newestRecords(a,b,'receivedAt'));
-  if (!list.length) {
-    body.innerHTML = '<tr><td colspan="10" class="empty">' + (isFollowFilter ? '暂无待跟进询盘，干得好！' : '暂无询盘，点击右上角新增') + '</td></tr>';
-    renderInqBatchBar();
-    return;
-  }
-  // 行内交互（v20260902d）：状态行内下拉（强制填原因）/ 下次跟进行内日期 / 责任人点击过滤
-  // 事件统一由 #inqListBody 上的委托处理器分发（见文件尾部 initInqListDelegation）
-  body.innerHTML = list.map((q) => {
-    const st = q.status || '新询盘';
-    const statusOpts = INQ_STATUSES.map((s) => '<option' + (s === st ? ' selected' : '') + '>' + s + '</option>').join('');
-    return '<tr class="' + (inqSelected.has(q.id) ? 'sel' : '') + '">'
-    + '<td><input type="checkbox" class="cb-inq" data-iid="' + q.id + '" ' + (inqSelected.has(q.id) ? 'checked' : '') + ' /></td>'
-    + '<td><a class="link-name" data-detail-name="' + esc(displayClientName(q)) + '">' + esc(displayClientName(q)) + '</a></td>'
-    + '<td>' + esc(q.country || '-') + '</td>'
-    + '<td>' + esc(q.product || '-') + '</td>'
-    + '<td>' + esc(q.source || '-') + '</td>'
-    + '<td><select class="il-status" data-iid="' + q.id + '" data-no-combo title="点击变更状态（需填写原因）">' + statusOpts + '</select></td>'
-    + '<td>' + (q.expectedAmount ? Number(q.expectedAmount).toLocaleString() + ' ' + esc(q.currency || 'USD') : '—') + '</td>'
-    + '<td><input type="date" class="il-follow" data-iid="' + q.id + '" value="' + esc(q.nextFollowAt || '') + '" title="点击修改下次跟进日期" /></td>'
-    + '<td class="il-owner" data-owner-f="' + esc(q.ownerName || q.owner || '') + '" title="点击按该跟进人过滤">' + esc(q.ownerName || q.owner || '-') + '</td>'
-    + '<td>'
-    + '<button class="link-btn" data-edit-i="' + q.id + '">编辑</button>'
-    + '<button class="link-btn" data-qt-from-i="' + q.id + '">📋 报价</button>'
-    + '<button class="link-btn ai" data-ai-i="' + q.id + '">🤖 建议</button>'
-    + '<button class="link-btn danger" data-del-i="' + q.id + '">删除</button></td>'
-    + '</tr>';
-  }).join('');
-  renderInqBatchBar();
+  if(typeof renderInqWorkspaceList==='function')renderInqWorkspaceList();
 }
 
 // -------- WhatsApp 发起（号码优先取关联客户档案，其次询盘自带电话）--------
@@ -374,6 +333,16 @@ function guessCountryFromEmail(email) {
   return '';
 }
 
+function inqStageHistoryHtml(q){
+  const logs=Array.isArray(q.stageLog)?q.stageLog:[];
+  const format=value=>{const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleString('zh-CN',{hour12:false}):'时间未记录';};
+  return `<section class="inq-record-panel" id="inqStageHistory"><h3>状态变更记录</h3>${logs.length?`<ol class="inq-history-list">${logs.slice().reverse().map(log=>`<li><div><b>${esc(log.from||'建立询盘')} → ${esc(log.to||'未记录')}</b><span>${log.automatic?'自动联动':'人工变更'}</span></div><p>原因：${esc(log.reason||'历史记录未填写原因')}</p><small>${esc(format(log.at))} · ${esc(log.by||'操作人未记录')}</small></li>`).join('')}</ol>`:q.lastStageReason?`<p>最近变更原因：${esc(q.lastStageReason)}</p><p class="muted">此前未保存完整状态节点。</p>`:'<p class="muted">暂无状态变更记录。</p>'}</section>`;
+}
+function inqRelatedBusinessHtml(q){
+  const linked=inquiryLinkedRows(q);
+  if(!linked.quotes.length&&!linked.orders.length)return '';
+  return `<section class="inq-record-panel" id="inqRelatedBusiness"><h3>关联报价与订单</h3><p class="muted">以下为最新业务信息；原询盘需求、来源、备注及沟通记录继续保留。</p>${linked.quotes.map(quote=>`<div class="inq-related-row"><b>报价 ${esc(quote.quoteNo||'未填编号')}</b><span>${esc(quote.status||'草稿')} · ${esc(quote.currency||'USD')} ${qtTotal(quote.items).toLocaleString()} · V${Number(quote.version)||1}</span></div>`).join('')}${linked.orders.map(order=>`<div class="inq-related-row"><b>订单 ${esc(order.orderNo||'未填编号')}</b><span>${esc(order.status||'待确认')} · ${esc(order.currency||'USD')} ${Number(order.amount||0).toLocaleString()}</span></div>`).join('')}</section>`;
+}
 function openInqModal(arg) {
   // 支持传入 id 字符串（编辑）、预填对象（AI 转人工）、或不传（新增）
   let q, editId = '';
@@ -383,7 +352,7 @@ function openInqModal(arg) {
   const isEdit = !!editId;
 
   const srcOpts = ['<option value="">—</option>', ...INQ_SOURCES.map((s) => `<option ${s === q.source ? 'selected' : ''}>${s}</option>`)].join('');
-  const stOpts = INQ_STATUSES.map((s) => `<option ${s === q.status ? 'selected' : ''}>${s}</option>`).join('');
+  const stOpts = (q.status&&!INQ_STATUSES.includes(q.status)?`<option value="${esc(q.status)}" selected>${esc(q.status)}（历史阶段）</option>`:'')+INQ_STATUSES.map((s) => `<option ${s === q.status ? 'selected' : ''}>${s}</option>`).join('');
   const curOpts = CURRENCIES.map((c) => `<option ${c === (q.currency || 'USD') ? 'selected' : ''}>${c}</option>`).join('');
   const countryOpts = window.countryOptionsHtml
     ? window.countryOptionsHtml(q.country)
@@ -423,6 +392,7 @@ function openInqModal(arg) {
         <div class="field"><label>币种</label><select name="currency">${curOpts}</select></div>
       </div>
     </div>
+    ${isEdit?inqStageHistoryHtml(q)+inqRelatedBusinessHtml(q):''}
     <details id="inqMore" class="inq-more"${isEdit ? ' open' : ''}>
       <summary>其他信息<span id="inqMoreHint">（手动填写时在此补充）</span></summary>
       <div class="form-grid">
@@ -456,6 +426,7 @@ function openInqModal(arg) {
   `);
 
   const inqForm = $('#modalForm');
+  inqForm.scrollTop=0;
   const $$1 = (sel) => inqForm.querySelector(sel);
 
   // —— 客户匹配：命中老客户则带出档案并提示，未命中提示将新建 ——
@@ -617,6 +588,10 @@ function openInqModal(arg) {
     }));
   }
 
+  // Submit only fields actually edited, preserving any updates made while this window is open.
+  const initialFields=Object.fromEntries(new FormData(inqForm).entries());
+  const initialAttachments=JSON.stringify(existingAttachments);
+
   $('#modalForm').onsubmit = async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target).entries());
@@ -628,8 +603,11 @@ function openInqModal(arg) {
       if (core) { core.classList.remove('hidden'); (nameInput || {}).focus && nameInput.focus(); }
       return;
     }
-    // 设为成交时打点 wonAt，供业绩按「成交月份」归属
-    if (fd.status === '成交' && !fd.wonAt) fd.wonAt = Date.now();
+    if(isEdit&&fd.status!==initialFields.status){
+      const reason=(window.prompt('请填写阶段变更原因：')||'').trim();
+      if(!reason)return toast('已取消：未填写变更原因');
+      fd.lastStageReason=reason;
+    }
     // 上传新附件
     const uploaded = [];
     if (newFiles.length) {
@@ -683,12 +661,22 @@ function openInqModal(arg) {
     }
     fd.clientId = linkedClient ? linkedClient.id : (q.clientId || null);
 
+    let payload=fd;
+    if(isEdit){
+      payload=Object.fromEntries(Object.entries(fd).filter(([key,value])=>{
+        if(key==='lastStageReason')return true;
+        if(key==='attachments')return JSON.stringify(value)!==initialAttachments;
+        if(key==='clientId')return String(value||'')!==String(q.clientId||'');
+        if(key==='ownerName')return fd.owner!==initialFields.owner;
+        return String(value??'')!==String(initialFields[key]??'');
+      }));
+    }
     const url = editId ? '/api/inquiries/' + editId : '/api/inquiries';
     const m = editId ? 'PUT' : 'POST';
-    const r = await api(url, { method: m, body: JSON.stringify(fd) });
+    const r = await api(url, { method: m, body: JSON.stringify(payload) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); toast('保存失败：' + (j.error || r.status)); return; }
     // 同步客户资料的跟进人：如果询盘有关联客户且跟进人变了，自动更新客户档案
-    if (fd.clientName && fd.owner) {
+    if (fd.clientName && fd.owner && (!isEdit || 'owner' in payload)) {
       try {
         const matchedClients = (typeof clients !== 'undefined') ? clients.filter((c) => (c.company || '').trim() === fd.clientName.trim()) : [];
         for (const c of matchedClients) {
@@ -844,8 +832,11 @@ window.openInqModal = openInqModal;
       renderInqBoard(); renderInqList();
       return;
     }
-    const btn = e.target.closest('button[data-edit-i], button[data-qt-from-i], button[data-ai-i], button[data-del-i], a.link-name[data-detail-name]');
-    if (!btn) return;
+    const btn = e.target.closest('button[data-view-i], button[data-inq-follow], button[data-inq-links], button[data-edit-i], button[data-qt-from-i], button[data-ai-i], button[data-del-i], a.link-name[data-detail-name]');
+    if (!btn) {const row=e.target.closest('[data-inquiry-row]');if(row&&!e.target.closest('input,select,summary,a,button'))openInqDetail(row.dataset.inquiryRow);return;}
+    if(btn.dataset.viewI){openInqDetail(btn.dataset.viewI);return;}
+    if(btn.dataset.inqFollow){openInqFollowModal(btn.dataset.inqFollow);return;}
+    if(btn.dataset.inqLinks){openInquiryLinks(btn.dataset.inqLinks);return;}
     if (btn.dataset.editI) { openInqModal(btn.dataset.editI); return; }
     if (btn.dataset.qtFromI) { const inq = inquiries.find((x) => x.id === btn.dataset.qtFromI); if (inq && typeof createQuoteFromInquiry === 'function') createQuoteFromInquiry(inq); return; }
     if (btn.dataset.aiI) { const inq = inquiries.find((x) => x.id === btn.dataset.aiI); if (inq && typeof openAiAnalyze === 'function') openAiAnalyze(inq); return; }
@@ -890,25 +881,12 @@ window.openInqModal = openInqModal;
 
 // 询盘批量：勾选后只更新顶部「批量编辑 / 批量删除」按钮的计数与高亮，实际编辑走弹窗
 function renderInqBatchBar() {
-  const n = inqSelected.size;
-  const edit = document.getElementById('inqBatchEdit');
-  if (edit) {
-    edit.textContent = n ? '✏️ 批量编辑 (' + n + ')' : '✏️ 批量编辑';
-    edit.classList.toggle('btn-mini--active', n > 0);
-    edit.title = n ? '修改选中的 ' + n + ' 条询盘' : '先勾选左侧复选框，再点此批量修改';
-  }
-  const del = document.getElementById('inqBatchDelete');
-  if (del) {
-    del.textContent = n ? '🗑️ 批量删除 (' + n + ')' : '🗑️ 批量删除';
-    del.classList.toggle('btn-mini--active', n > 0);
-    del.title = n ? '删除选中的 ' + n + ' 条询盘（不可恢复）' : '先勾选左侧复选框，再点此批量删除';
-  }
-  const all = document.getElementById('cbInqAll');
-  if (all) {
-    const total = document.querySelectorAll('#inqListBody .cb-inq').length;
-    all.checked = total > 0 && n >= total;
-    all.indeterminate = n > 0 && n < total;
-  }
+  const valid=new Set(inquiries.map(q=>q.id));for(const id of inqSelected)if(!valid.has(id))inqSelected.delete(id);
+  const n=inqSelected.size;
+  for(const [id,label] of [['inqBatchEdit','批量编辑'],['inqBatchDelete','批量删除']]){const b=$('#'+id);if(b){b.textContent=label+(n?' ('+n+')':'');b.disabled=!n;}}
+  if($('#inqSelectionMeta'))$('#inqSelectionMeta').textContent=n?'已选择 '+n+' 条':'选择后可批量操作';
+  if($('#inqClearSelection'))$('#inqClearSelection').hidden=!n;
+  const all=$('#cbInqAll');if(all){const rows=[...document.querySelectorAll('#inqListBody .cb-inq')],selected=rows.filter(r=>inqSelected.has(r.dataset.iid)).length;all.checked=rows.length>0&&selected===rows.length;all.indeterminate=selected>0&&selected<rows.length;}
 }
 // 兼容旧调用名
 function bindInqBatchBar() {}
@@ -944,6 +922,7 @@ function openInqBatchEdit() {
     + '<div class="batch-note">已选中 <b>' + ids.length + '</b> 条询盘，将统一修改下面选择的字段</div>'
     + '<div class="field"><label>修改字段</label><select id="bmField"><option value="status">状态</option><option value="owner">跟进人</option></select></div>'
     + '<div class="field" id="bmGradeWrap"><label>新状态</label><select id="bmGrade">' + stOpts + '</select></div>'
+    + '<div class="field" id="bmReasonWrap"><label>阶段变更原因</label><textarea id="bmReason" placeholder="填写本次批量变更的原因"></textarea></div>'
     + '<div class="field hidden" id="bmOwnerWrap"><label>新跟进人</label><select id="bmOwner">' + uOpts + '</select></div>'
     + '<div class="modal-foot"><button type="button" class="btn-ghost" id="bmCancel">取消</button>'
     + '<button type="submit" class="btn-save">应用到 ' + ids.length + ' 条询盘</button></div>',
@@ -951,6 +930,7 @@ function openInqBatchEdit() {
   const fld = document.getElementById('bmField');
   fld.onchange = () => {
     document.getElementById('bmGradeWrap').classList.toggle('hidden', fld.value !== 'status');
+    document.getElementById('bmReasonWrap').classList.toggle('hidden', fld.value !== 'status');
     document.getElementById('bmOwnerWrap').classList.toggle('hidden', fld.value !== 'owner');
   };
   document.getElementById('bmCancel').onclick = closeModal;
@@ -964,12 +944,13 @@ function openInqBatchEdit() {
       payload = { owner: value, ownerName: ((window.allUsers || []).find((u) => u.id === value) || {}).name || '' };
     } else {
       const st = document.getElementById('bmGrade').value;
-      payload = { status: st };
-      if (st === '成交') payload.wonAt = Date.now();
+      const reason=document.getElementById('bmReason').value.trim();
+      if(!reason)return toast('请填写阶段变更原因');
+      payload = { status: st, lastStageReason:reason };
     }
     let ok = 0;
     for (const id of ids) {
-      try { await api('/api/inquiries/' + id, { method: 'PUT', body: JSON.stringify(payload) }); ok++; } catch {}
+      try { const r=await api('/api/inquiries/' + id, { method: 'PUT', body: JSON.stringify(payload) });if(r.ok)ok++; } catch {}
     }
     toast('已更新 ' + ok + ' 条询盘');
     inqSelected.clear();

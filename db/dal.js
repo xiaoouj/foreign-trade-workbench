@@ -35,12 +35,12 @@ const ARRAYS = {
     int: ['createdAt', 'updatedAt'], bool: ['isPrimary'],
   },
   orders: {
-    fields: ['id', 'orderNo', 'clientName', 'country', 'amount', 'currency', 'status', 'orderDate', 'deliveryDate', 'paymentTerms', 'notes', 'owner', 'ownerName', 'clientId', 'source', 'quoteId', 'createdAt', 'updatedAt', 'items', 'productionProgress', 'depositPercent', 'paidPercent'],
+    fields: ['id', 'orderNo', 'clientName', 'country', 'amount', 'currency', 'status', 'orderDate', 'deliveryDate', 'paymentTerms', 'notes', 'owner', 'ownerName', 'clientId', 'source', 'quoteId', 'createdAt', 'updatedAt', 'items', 'productionProgress', 'depositPercent', 'paidPercent', 'inquiryId'],
     int: ['createdAt', 'updatedAt'], json: ['items'], dec: ['amount','productionProgress','depositPercent','paidPercent'], date: ['orderDate', 'deliveryDate'],
   },
   inquiries: {
-    fields: ['id', 'clientName', 'country', 'contactName', 'contactEmail', 'source', 'receivedAt', 'product', 'model', 'status', 'expectedAmount', 'currency', 'sampleSent', 'owner', 'lastFollowAt', 'nextFollowAt', 'notes', 'createdAt', 'updatedAt', 'ownerName', 'contactPhone', 'wonAt', 'clientId', 'chatLog', 'attachments'],
-    int: ['createdAt', 'updatedAt', 'wonAt'], dec: ['expectedAmount'], date: ['receivedAt', 'lastFollowAt', 'nextFollowAt'], json: ['chatLog', 'attachments'],
+    fields: ['id', 'clientName', 'country', 'contactName', 'contactEmail', 'source', 'receivedAt', 'product', 'model', 'status', 'expectedAmount', 'currency', 'sampleSent', 'owner', 'lastFollowAt', 'nextFollowAt', 'notes', 'createdAt', 'updatedAt', 'ownerName', 'contactPhone', 'wonAt', 'clientId', 'chatLog', 'attachments','stageLog','lastStageReason','originQuoteId','followLog'],
+    int: ['createdAt', 'updatedAt', 'wonAt'], dec: ['expectedAmount'], date: ['receivedAt', 'lastFollowAt', 'nextFollowAt'], json: ['chatLog', 'attachments','stageLog','followLog'],
   },
   chats: {
     fields: ['id', 'createdAt', 'updatedAt', 'lines', 'clientName', 'title', 'raw', 'owner', 'ownerName'],
@@ -76,6 +76,8 @@ const ARRAYS = {
   'product-documents': { generic: true },
   'product-imports': { generic: true },
   'product-category-settings': { generic: true },
+  'inquiry-drafts': { generic: true },
+  'inquiry-mcp-tokens': { generic: true },
 };
 
 const KV = ['settings', 'ai-config', 'mail', 'mail-sent', 'notifications', 'system-notices'];
@@ -236,14 +238,15 @@ export async function initDAL() {
   try {
     pool = await createPool();
     for (const sql of buildSchemaSQL()) {
-      await pool.query(sql);
+      try { await pool.query(sql); }
+      catch(error) { if(/CREATE TABLE IF NOT EXISTS `inquiry_(drafts|mcp_tokens)`/.test(sql))error.inquiryIntakeMigration=true;throw error; }
     }
     try {
       const [itemColumns] = await pool.query("SHOW COLUMNS FROM `orders` LIKE 'items'");
       if (!itemColumns.length) await pool.query('ALTER TABLE `orders` ADD COLUMN `items` JSON NULL');
     } catch (error) { error.orderItemsMigration = true; throw error; }
     try {
-      for (const [table,columns] of Object.entries({orders:{productionProgress:'DECIMAL(5,2)',depositPercent:'DECIMAL(5,2)',paidPercent:'DECIMAL(5,2)'},quotations:{depositPercent:'DECIMAL(5,2)',tradeTerms:'TEXT',revisionHistory:'JSON'}})) {
+      for (const [table,columns] of Object.entries({orders:{inquiryId:'TEXT',productionProgress:'DECIMAL(5,2)',depositPercent:'DECIMAL(5,2)',paidPercent:'DECIMAL(5,2)'},quotations:{depositPercent:'DECIMAL(5,2)',tradeTerms:'TEXT',revisionHistory:'JSON'},inquiries:{stageLog:'JSON',lastStageReason:'TEXT',originQuoteId:'TEXT',followLog:'JSON'}})) {
         const [existing]=await pool.query('SHOW COLUMNS FROM `'+table+'`');
         const names=new Set(existing.map(c=>c.Field));
         for(const [column,type] of Object.entries(columns)) if(!names.has(column)) await pool.query('ALTER TABLE `'+table+'` ADD COLUMN `'+column+'` '+type+' NULL');
@@ -256,7 +259,7 @@ export async function initDAL() {
     console.log('[dal] MySQL 存储已启用（数据库 ' + (process.env.FTW_DB_NAME || 'ftw') + '）');
     return 'mysql';
   } catch (e) {
-    if (e.orderItemsMigration || e.salesMigration) throw e; // Migration failure must not switch business storage.
+    if (e.orderItemsMigration || e.salesMigration || e.inquiryIntakeMigration) throw e; // Migration failure must not switch business storage.
     console.error('[dal] MySQL 初始化失败，降级为 JSON 文件模式：', e && e.message);
     mode = 'json';
     pool = null;
@@ -481,6 +484,30 @@ export async function commitCatalog(collections, connection) {
   finally { conn.release(); }
 }
 
+// Draft confirmation and formal inquiry creation share one transaction.
+export async function commitInquiryIntake(collections, connection) {
+  const allowed=new Set(['inquiries','inquiry-drafts']);
+  for(const [base,rows] of Object.entries(collections))if(!allowed.has(base)||!Array.isArray(rows))throw new Error('Invalid inquiry intake collection');
+  const conn=connection||await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for(const [base,rows] of Object.entries(collections)) {
+      const table=tableOf(base),desc=ARRAYS[base];
+      if(desc.generic) {
+        await conn.query('DELETE FROM `'+table+'`');
+        for(const row of rows)await conn.query('INSERT INTO `'+table+'` (id,data) VALUES (?,?)',[row.id,JSON.stringify(row)]);
+      } else {
+        const cols=desc.fields,sql='INSERT INTO `'+table+'` ('+cols.map(k=>'`'+k+'`').join(',')+') VALUES ('+cols.map(()=>'?').join(',')+') ON DUPLICATE KEY UPDATE '+cols.filter(k=>k!=='id').map(k=>'`'+k+'`=VALUES(`'+k+'`)').join(',');
+        for(const row of rows)await conn.query(sql,cols.map(k=>toSqlVal(row[k],desc,k)));
+        const ids=rows.map(row=>row.id);
+        if(ids.length)await conn.query('DELETE FROM `'+table+'` WHERE id NOT IN ('+ids.map(()=>'?').join(',')+')',ids);
+        else await conn.query('DELETE FROM `'+table+'`');
+      }
+    }
+    await conn.commit();
+  }catch(error){await conn.rollback();throw error;}finally{conn.release();}
+}
+
 // Update only selected order fields, in one transaction; never rewrite the collection.
 export async function patchOrders(ids, patch, canAccess) {
   const desc = ARRAYS.orders;
@@ -523,3 +550,20 @@ export async function applyClientMerge(changes, removedIds){
  await conn.commit();
  }catch(e){await conn.rollback();throw e;}finally{conn.release();}
 }
+
+// Persist a quotation and its opportunity in the same transaction. Inputs contain complete collections.
+export async function commitQuoteInquiry(collections,connection,removeMissing=false){
+ const conn=connection||await pool.getConnection();
+ try{await conn.beginTransaction();
+  for(const [base,rows] of Object.entries(collections)){
+   if(!(removeMissing?['quotations','inquiries','orders','exceptions','tasks']:['quotations','inquiries']).includes(base)||!Array.isArray(rows))throw Error('Invalid quote/opportunity collection');
+   const desc=ARRAYS[base];if(desc.generic){for(const row of rows)await conn.query('INSERT INTO `'+tableOf(base)+'` (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)',[row.id,JSON.stringify(row)]);continue;}
+   const cols=desc.fields,sql='INSERT INTO `'+tableOf(base)+'` ('+cols.map(k=>'`'+k+'`').join(',')+') VALUES ('+cols.map(()=>'?').join(',')+') ON DUPLICATE KEY UPDATE '+cols.filter(k=>k!=='id').map(k=>'`'+k+'`=VALUES(`'+k+'`)').join(',');
+   for(const row of rows)await conn.query(sql,cols.map(k=>toSqlVal(row[k],desc,k)));
+   if(removeMissing&&['quotations','inquiries'].includes(base)){const ids=rows.map(r=>r.id);if(ids.length)await conn.query('DELETE FROM `'+tableOf(base)+'` WHERE id NOT IN (?)',[ids]);else await conn.query('DELETE FROM `'+tableOf(base)+'`');}
+  }
+  await conn.commit();
+ }catch(error){await conn.rollback();throw error;}finally{conn.release();}
+}
+
+export async function commitQuoteVersionMerge(collections,connection){return commitQuoteInquiry(collections,connection,true);}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ftw-inquiry-drafts": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:\\FTW-MCP\\ftw-crm-mcp.cjs"],
+      "runtime": {"type": "node", "version": "22"},
+      "env": {
+        "FTW_CRM_URL": "http://localhost:4173",
+        "FTW_CRM_TOKEN": "在CRM询盘页的MCP接入中生成个人凭据后填写"
+      }
+    }
+  }
+}

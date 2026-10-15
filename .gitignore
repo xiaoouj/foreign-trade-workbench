@@ -41,3 +41,7 @@ gui-test-screenshots/
 coverage/
 test-results/
 playwright-report/
+
+import-source/
+!public/category-images/
+!public/category-images/*.png

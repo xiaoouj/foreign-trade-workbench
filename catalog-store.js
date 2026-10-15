@@ -2,8 +2,8 @@ import path from 'node:path';
 
 // JSON uses a persisted rollback journal; MySQL commits all collections in one transaction.
 // All callers run inside the application's existing write queue.
-export function createCatalogStore({ dataDir, read, write, jsonRead, jsonWrite, dal, mode }) {
-  const journal = path.join(dataDir, 'catalog-write-journal.json');
+export function createCatalogStore({ dataDir, read, write, jsonRead, jsonWrite, dal, mode, journalName='catalog-write-journal.json', mysqlCommit='commitCatalog' }) {
+  const journal = path.join(dataDir, journalName);
   const file = base => path.join(dataDir, base + '.json');
   async function recover() {
     if (mode() !== 'json') return;
@@ -13,7 +13,7 @@ export function createCatalogStore({ dataDir, read, write, jsonRead, jsonWrite, 
     await jsonWrite(journal, { active: false, recoveredAt: Date.now() });
   }
   async function commit(collections) {
-    if (mode() === 'mysql') return dal.commitCatalog(collections);
+    if (mode() === 'mysql') return dal[mysqlCommit](collections);
     const originals = {};
     for (const base of Object.keys(collections)) originals[base] = await read(file(base), []);
     await jsonWrite(journal, { active: true, originals, at: Date.now() });

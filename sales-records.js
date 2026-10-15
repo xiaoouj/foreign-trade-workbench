@@ -48,3 +48,6 @@ export function reviseQuote(previous, input, user, now) {
   next.revisionHistory=history;
   return next;
 }
+
+export const quoteNumberKey=value=>String(value||'').normalize('NFKC').replace(/\s+/g,'').toUpperCase();
+export function quoteContentKey(quote){return JSON.stringify(Object.fromEntries(Object.keys(fields).map(key=>[key,key==='quoteNo'?quoteNumberKey(quote[key]):canonical(quote[key],key)])));}

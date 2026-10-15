@@ -47,7 +47,6 @@ function renderSettings() {
       <div class="card-head"><div class="card-title">📥 数据导入</div></div>
       <div class="set-links">
         <button class="set-link" id="setImpClients">👥 导入客户记录<span class="muted">文本粘贴 / txt / CSV / Excel</span></button>
-        <button class="set-link" id="setImpComms">💬 导入沟通记录<span class="muted">文本粘贴 / txt / CSV / Excel</span></button>
       </div>
       <p class="muted" style="font-size:12px;margin-top:10px">支持直接粘贴从 Excel 复制的表格内容；列顺序见导入窗口说明。</p>
     </div>
@@ -55,15 +54,13 @@ function renderSettings() {
     <div class="card set-card">
       <div class="card-head"><div class="card-title">ℹ 关于</div></div>
       <div class="muted" style="font-size:13px;line-height:1.8">
-        外贸人工作台 · 数据保存在 NAS 本地（内网）<br>
-        消息接入（WhatsApp / 邮件收信）由 connectors 服务推送到「沟通」模块
+        外贸人工作台 · 数据保存在 NAS 本地（内网）
       </div>
     </div>
   `;
   $('#setAi').onclick = () => { if (typeof openAiSettings === 'function') openAiSettings(); };
   $('#setUsers').onclick = () => openUserMgmt();
   $('#setImpClients').onclick = () => openImportModal('clients');
-  $('#setImpComms').onclick = () => openImportModal('comms');
 
   // 询盘来源编辑
   let inqSources = [];

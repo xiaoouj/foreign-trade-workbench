@@ -1,0 +1,14 @@
+{
+  "source": "manual-test",
+  "accountId": "test",
+  "sourceRecordId": "请替换为你的姓名和当天日期-001，两次调用保持相同",
+  "sourceSentAt": "2026-10-13",
+  "rawText": "[MCP测试，非真实客户]\nPlease quote 2 belt conveyors, length 6m and width 800mm. Budget and currency are not specified.\n请完整保留这段原文，不进入正式询盘。",
+  "fields": {
+    "clientName": "MCP测试客户",
+    "product": "皮带输送机",
+    "expectedAmount": null,
+    "currency": ""
+  },
+  "isTest": true
+}
