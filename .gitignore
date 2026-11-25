@@ -42,6 +42,10 @@ coverage/
 test-results/
 playwright-report/
 
-import-source/
 !public/category-images/
 !public/category-images/*.png
+
+!public/category-images/
+!public/category-images/*.png
+
+!docs/screenshots/tasks-synthetic.jpg

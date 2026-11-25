@@ -16,3 +16,6 @@ code-backup
 
 import-source
 !public/category-images/*.png
+
+import-source
+!public/category-images/*.png

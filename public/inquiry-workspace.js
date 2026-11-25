@@ -1,143 +1,278 @@
-// Inquiry workspace: clear list/board controls, explicit business links and persistent follow-up records.
-let inqWorkspacePage=1,inqWorkspacePageSize=20,inqWorkspaceStage='',inqDetailId='',inqDetailTab='status',inqDetailExpanded=false;
-try{const value=Number(localStorage.getItem('ftw.inqPageSize'));if([10,20,50].includes(value))inqWorkspacePageSize=value;}catch{}
-const inqStageTone=status=>({'新询盘':'blue','已报价':'violet','等回复':'amber','谈判中':'orange','成交':'green','输单':'red','暂缓':'gray','无效':'gray'}[status]||'gray');
-const inqStageBadge=status=>`<span class="inq-stage-badge ${inqStageTone(status)}">${esc(status||'新询盘')}</span>`;
-function inqFullDate(value){if(!value)return '未记录';const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleString('zh-CN',{hour12:false}):String(value);}
-function inqPlainText(value){if(Array.isArray(value))return value.map(v=>typeof v==='string'?v:JSON.stringify(v)).join('\n');return value==null?'':String(value);}
-function inqWorkspaceFilter(rows,{ignoreStage=false}={}){
-  const value=id=>document.getElementById(id)?.value||'',owner=value('inqOwnerFilter'),source=value('inqSourceFilter'),follow=value('inqFollowScope'),country=value('inqCountryFilter'),from=value('inqReceivedFrom'),to=value('inqReceivedTo'),today=todayStr();
-  return rows.filter(q=>{
-    const status=q.status||'新询盘',received=String(q.receivedAt||'').slice(0,10);
-    if(!ignoreStage&&inqWorkspaceStage&&(inqWorkspaceStage==='closed'?!['输单','暂缓','无效'].includes(status):status!==inqWorkspaceStage))return false;
-    if(owner&&q.owner!==owner)return false;if(source&&q.source!==source)return false;if(country&&q.country!==country)return false;
-    if(from&&(!received||received<from))return false;if(to&&(!received||received>to))return false;
-    if(follow==='due'&&(!q.nextFollowAt||q.nextFollowAt>today))return false;
-    if(follow==='today'&&q.nextFollowAt!==today)return false;
-    if(follow==='missing'&&q.nextFollowAt)return false;
-    return true;
-  });
-}
-function inqWorkspaceRows(){
-  const stamp=value=>{if(value==null||value==='')return 0;const n=typeof value==='number'||/^\d+$/.test(String(value))?Number(value):Date.parse(value);return Number.isFinite(n)&&n>0?n:0;};
-  const created=q=>stamp(q.createdAt)||stamp(q.receivedAt);
-  return inqSearch(inqFilteredAll(inquiries)).slice().sort((a,b)=>created(b)-created(a)||stamp(b.receivedAt)-stamp(a.receivedAt)||String(b.id).localeCompare(String(a.id)));
-}
-function inqPopulateFilters(){
-  for(const [id,rows] of [['inqOwnerFilter',[...new Map(inquiries.filter(q=>q.owner).map(q=>[q.owner,{value:q.owner,label:q.ownerName||q.owner}])).values()]],['inqSourceFilter',[...new Set(inquiries.map(q=>q.source).filter(Boolean))].sort().map(v=>({value:v,label:v}))],['inqCountryFilter',[...new Set(inquiries.map(q=>q.country).filter(Boolean))].sort().map(v=>({value:v,label:v}))]]){
-    const select=$('#'+id),selected=select.value;select.innerHTML='<option value="">全部</option>'+rows.map(v=>`<option value="${esc(v.value)}">${esc(v.label)}</option>`).join('');select.value=rows.some(v=>v.value===selected)?selected:'';
+
+// Live adapter around the supplied enquiry.html rendering functions.
+(function(){
+ var draw=null,loadState='pending';
+ window.crmEnquiryRender=function(){if(draw)draw()};
+ window.renderInqWorkspaceList=window.crmEnquiryRender;
+ window.setInqWorkspaceLoadState=function(state){loadState=state;if(draw)draw()};
+ document.addEventListener('DOMContentLoaded',function(){
+ var CP=window.CRMPrototype,root=document.getElementById('crm-enquiry'),idmap={"fmoreBtn": "eqp-fmoreBtn", "nextD": "eqp-nextD", "bX": "eqp-bX", "moreBtn": "eqp-moreBtn", "drTitle": "eqp-drTitle", "fFl": "eqp-fFl", "viewSeg": "eqp-viewSeg", "stages": "inqStageSummary", "count": "eqp-count", "note": "eqp-note", "fbar": "eqp-fbar", "fpanel": "eqp-fpanel", "drawer": "eqp-drawer", "page": "eqp-page", "sum": "eqp-sum", "addBtn": "inqAdd", "fmoreInfo": "eqp-fmoreInfo", "q": "inqSearch", "reset": "eqp-reset", "qWrap": "eqp-qWrap", "anomBtn": "eqp-anomBtn", "batch": "eqp-batch", "ckAll": "eqp-ckAll", "fSrc": "eqp-fSrc", "board": "eqp-board", "moreMenu": "eqp-moreMenu", "view": "eqp-view", "bN": "eqp-bN", "saveNote": "eqp-saveNote", "headSub": "eqp-headSub", "drX": "eqp-drX", "draftBtn": "eqp-draftBtn", "fOwner": "eqp-fOwner", "fmore": "eqp-fmore", "drBg": "eqp-drBg", "aiBtn": "aiRegisterBtn"};
+ if(!root)return;
+ var esc=CP.h,ic=CP.ic,fmtW=CP.fmtW,pct=CP.pct,ftwToast=function(m){toast(m)},ftwPlace=CP.place;
+ function selector(s){return s.replace(/#([a-zA-Z][a-zA-Z0-9_-]*)/g,function(_,id){return '#'+(idmap[id]||id)})}
+
+  var D={},TODAY=CP.today(),IQ=[],account='',drafts=new Map(),legacy=[],auxMode='',badgeRequest=0;
+  var $=function(s,r){return (r||root).querySelector(selector(s))}, $$=function(s,r){return Array.prototype.slice.call((r||root).querySelectorAll(selector(s)))};
+  function dd(a,b){return Math.round((new Date(b)-new Date(a))/864e5)}
+  var OWN={'管理员':'o3'};
+  function av(o,small){return '<span class="own" title="'+esc(o||'未分配')+'"><i class="'+(OWN[o]||'o0')+'" aria-hidden="true">'+esc((o||'?').slice(0,1).toUpperCase())+'</i>'+(small?'<span class="sr">负责人 '+esc(o||'未分配')+'</span>':esc(o||'未分配'))+'</span>'}
+  var S=[
+    {k:'新询盘',c:'var(--c-new)',t:'t-new'},{k:'已报价',c:'var(--c-quote)',t:'t-quote'},{k:'等回复',c:'var(--c-wait)',t:'t-wait'},
+    {k:'谈判中',c:'var(--c-neg)',t:'t-neg'},{k:'成交',c:'var(--c-won)',t:'t-won'},{k:'暂缓 / 无效',c:'var(--c-lost)',t:'t-lost',of:['暂缓','无效','输单']}
+  ];
+  function colOf(s){for(var i=0;i<S.length;i++){if(S[i].k===s||(S[i].of&&S[i].of.indexOf(s)>=0))return i}return S.length+Math.max(0,legacy.indexOf(s))}
+  function tagOf(s){return S[colOf(s)]?.t||'t-lost'}
+  function cny(q){return q.hasAmount?CP.cny(q.a,q.cur):null}
+  function amountSum(rows){var value=0,missing=0;rows.forEach(q=>{var n=cny(q);if(n==null){if(q.hasAmount)missing++}else value+=n});return {value,missing};}
+  function sumLabel(rows,short){var a=amountSum(rows),known=rows.some(q=>q.hasAmount&&cny(q)!=null);return (known?'¥'+fmtW(a.value):a.missing?'待折算':'')+(a.missing&&known?' + '+a.missing+' 笔待折算':'');}
+  function amt(q){return q.hasAmount?q.a.toLocaleString('en-US',{maximumFractionDigits:2})+' '+esc(q.cur||'USD'):q.invalidAmount?'金额待核对':''}
+  function byId(id){return IQ.find(q=>q.i===String(id))}
+  function refreshData(){
+    TODAY=CP.today();var uid=currentUser?.id||'';
+    if(account!==uid){if(window.__crmInquiryDataOwner!==uid&&(account||loadState!=='error'))loadState='pending';account=uid;drafts.clear();st.sel={};st.q=st.owner=st.src=st.fl='';st.stage=-1;st.page=1;st.view='board';auxMode='';closeDr();dr.replaceChildren();window.inqClientFilter='';window.inqClientIdFilter='';$('#eqp-country').value=$('#eqp-from').value=$('#eqp-to').value='';$('#q').value='';loadBadges();}
+    IQ=CP.allInquiries().map(CP.inquiryDTO);legacy=[...new Set(IQ.map(q=>q.s).filter(status=>!S.some(x=>x.k===status||x.of?.includes(status))))];
+    if(window.inqFollowFilter===true){st.q=st.owner=st.src='';st.fl='due';st.stage=-1;window.inqClientFilter='';window.inqClientIdFilter='';window.inqFollowFilter=false;$('#q').value='';}
+    st.q=$('#q').value.trim();for(var id of Object.keys(st.sel))if(!byId(id))delete st.sel[id];
+    refreshOptions();$('#anomBtn .n').textContent=String((typeof exceptions==='undefined'?[]:exceptions).filter(x=>x.status!=='已解决').length);
   }
-}
-function renderInqActiveFilters(){
-  const box=$('#inqActiveFilters');if(!box)return;const labels=[];
-  if(window.inqClientFilter)labels.push('客户：'+window.inqClientFilter);
-  if(inqOwnerFilterQ)labels.push('负责人：'+inqOwnerFilterQ);
-  if(inqWorkspaceStage)labels.push('阶段：'+(inqWorkspaceStage==='closed'?'输单 / 暂缓 / 无效':inqWorkspaceStage));
-  for(const [id,label] of [['inqOwnerFilter','负责人'],['inqSourceFilter','来源'],['inqFollowScope','跟进'],['inqCountryFilter','国家'],['inqReceivedFrom','收到日期起'],['inqReceivedTo','收到日期止']]){const el=$('#'+id);if(el?.value)labels.push(label+'：'+(el.tagName==='SELECT'?el.selectedOptions[0].textContent:el.value));}
-  if(inqSearchQ)labels.push('搜索：'+$('#inqSearch').value);
-  box.hidden=!labels.length;box.innerHTML=labels.map(label=>`<span>${esc(label)}</span>`).join('')+(labels.length?'<button type="button" id="inqClearFilters">清除筛选 ×</button>':'');
-  $('#inqClearFilters')?.addEventListener('click',inqResetWorkspaceFilters);
-}
-function renderInqStageSummary(){
-  const summary=$('#inqStageSummary');if(!summary)return;
-  const rows=inqSearch(inqWorkspaceFilter(inquiries.filter(q=>(!window.inqClientFilter||inquiryCustomerKey(q.clientName)===inquiryCustomerKey(window.inqClientFilter))&&(!inqOwnerFilterQ||(q.ownerName||q.owner||'')===inqOwnerFilterQ)),{ignoreStage:true}));
-  summary.innerHTML=[['','全部','blue'],['新询盘','新询盘','blue'],['已报价','已报价','violet'],['等回复','等回复','amber'],['谈判中','谈判中','orange'],['成交','成交','green'],['closed','输单 / 暂缓','red']].map(([value,label,tone])=>{const count=rows.filter(q=>!value||(value==='closed'?['输单','暂缓','无效'].includes(q.status):(q.status||'新询盘')===value)).length;return `<button type="button" data-inq-stage="${esc(value)}" class="${inqWorkspaceStage===value?'active ':''}${tone}" aria-pressed="${inqWorkspaceStage===value}" ${value==='closed'?'title="包括输单、暂缓和无效询盘"':''}><span>${label}</span><strong>${count}</strong><i aria-hidden="true">${value==='成交'?'✓':value==='closed'?'×':value==='等回复'?'◷':'▤'}</i></button>`;}).join('');
-  summary.querySelectorAll('[data-inq-stage]').forEach(button=>button.onclick=()=>{inqWorkspaceStage=button.dataset.inqStage;inqWorkspacePage=1;const active=$('#view-enquiry .subtab.active')?.dataset.subtab;if(!['list','board'].includes(active))$('#view-enquiry [data-subtab=list]').click();inqRefreshWorkspace();});
-  $('#inqExceptionCount').textContent=String(exceptions.filter(q=>q.status!=='已解决').length);
-}
-function renderInqWorkspaceList(){
-  const body=$('#inqListBody');if(!body)return;
-  if(window.inqFollowFilter===true){$('#inqFollowScope').value='due';inqWorkspacePage=1;window.inqFollowFilter=false;renderInqBoard();}
-  const rows=inqWorkspaceRows();inqWorkspacePage=Math.max(1,Math.min(inqWorkspacePage,Math.ceil(rows.length/inqWorkspacePageSize)||1));
-  const page=rows.slice((inqWorkspacePage-1)*inqWorkspacePageSize,inqWorkspacePage*inqWorkspacePageSize);
-  $('#inqResultMeta').textContent='共 '+rows.length+' 条';
-  body.innerHTML=page.length?page.map(q=>{const linked=inquiryLinkedRows(q),status=q.status||'新询盘',opts=(INQ_STATUSES.includes(status)?'':`<option value="${esc(status)}" selected>${esc(status)}（历史阶段）</option>`)+INQ_STATUSES.map(s=>`<option${s===status?' selected':''}>${s}</option>`).join(''),reason=q.lastStageReason||'',latest=(q.followLog||[]).at(-1),last=latest?.at||q.lastFollowAt;return `<tr data-inquiry-row="${esc(q.id)}" class="${q.id===inqDetailId?'selected ':''}${inqSelected.has(q.id)?'sel':''}"><td><input type="checkbox" class="cb-inq" data-iid="${esc(q.id)}" aria-label="选择 ${esc(displayClientName(q))}" ${inqSelected.has(q.id)?'checked':''} /></td><td class="inq-customer-cell"><button class="inq-customer-name" type="button" data-view-i="${esc(q.id)}" title="${esc(displayClientName(q))}">${esc(displayClientName(q))}</button><p title="${esc(q.product||'未填写产品')}">${esc(q.product||'未填写产品')}</p><small>${esc(q.country||'国家未填')} · <button class="inq-owner-link" type="button" data-owner-f="${esc(q.ownerName||q.owner||'')}">${esc(q.ownerName||'未分配')}</button></small></td><td><select class="il-status inq-stage-select ${inqStageTone(status)}" data-iid="${esc(q.id)}" data-no-combo aria-label="${esc(displayClientName(q))}的阶段">${opts}</select></td><td><button type="button" class="inq-business-link" data-inq-links="${esc(q.id)}">${linked.quotes.length||linked.orders.length?`报价 ${linked.quotes.length} · 订单 ${linked.orders.length}`:'关联报价 / 订单'}</button><small class="inq-row-amount">${q.expectedAmount?Number(q.expectedAmount).toLocaleString()+' '+esc(q.currency||'USD'):'金额未填'}</small></td><td class="inq-follow-col"><span>${last?esc(fmtDateShort(last)):'尚未跟进'}</span><p class="inq-row-reason" title="${esc(latest?.content||reason)}">${esc(latest?.content||reason||'暂无跟进说明')}</p>${q.nextFollowAt?`<small class="${q.nextFollowAt<todayStr()?'overdue':''}">下次 ${esc(q.nextFollowAt)}</small>`:''}</td><td class="inq-row-actions"><button class="inq-text-action" type="button" data-inq-follow="${esc(q.id)}">跟进</button><button class="inq-text-action" type="button" data-view-i="${esc(q.id)}" aria-label="查看 ${esc(displayClientName(q))} 详情">•••</button></td></tr>`;}).join(''):'<tr><td colspan="6"><div class="inq-empty"><b>没有符合筛选条件的询盘</b><p>可清除筛选，或新增询盘。</p><button type="button" class="btn-ghost" id="inqEmptyReset">清除筛选</button></div></td></tr>';
-  $('#inqEmptyReset')?.addEventListener('click',inqResetWorkspaceFilters);
-  $('#inqPageSize').value=String(inqWorkspacePageSize);
-  $('#inqPageMeta').textContent=rows.length?`第 ${(inqWorkspacePage-1)*inqWorkspacePageSize+1}–${Math.min(rows.length,inqWorkspacePage*inqWorkspacePageSize)} 条 / 共 ${rows.length} 条`:'共 0 条';
-  const pages=Math.ceil(rows.length/inqWorkspacePageSize),pager=$('#inqPagination');pager.innerHTML=pages>1?`<button type="button" class="page-btn" data-inq-page="prev" aria-label="上一页" ${inqWorkspacePage===1?'disabled':''}>‹</button>`+Array.from({length:pages},(_,i)=>i+1).filter(p=>p===1||p===pages||Math.abs(p-inqWorkspacePage)<=1).map((p,i,a)=>`${i&&p>a[i-1]+1?'<span>…</span>':''}<button type="button" class="page-btn ${p===inqWorkspacePage?'active':''}" data-inq-page="${p}" aria-label="第 ${p} 页">${p}</button>`).join('')+`<button type="button" class="page-btn" data-inq-page="next" aria-label="下一页" ${inqWorkspacePage===pages?'disabled':''}>›</button>`:'';
-  pager.querySelectorAll('[data-inq-page]').forEach(b=>b.onclick=()=>{inqWorkspacePage=b.dataset.inqPage==='prev'?inqWorkspacePage-1:b.dataset.inqPage==='next'?inqWorkspacePage+1:Number(b.dataset.inqPage);renderInqWorkspaceList();});
-  renderInqBatchBar();renderInqActiveFilters();renderInqStageSummary();
-  if(inqDetailId&&!rows.some(q=>q.id===inqDetailId))inqDetailId='';
-  body.querySelectorAll('[data-inquiry-row]').forEach(row=>row.classList.toggle('selected',row.dataset.inquiryRow===inqDetailId));
-  renderInqDetail();
-}
-function inqRefreshWorkspace(){renderInqBoard();renderInqList();renderInqStageSummary();}
-function inqResetWorkspaceFilters(){inqWorkspaceStage='';inqSearchQ='';inqOwnerFilterQ='';window.inqClientFilter='';window.inqFollowFilter=false;for(const id of ['inqSearch','inqOwnerFilter','inqSourceFilter','inqFollowScope','inqCountryFilter','inqReceivedFrom','inqReceivedTo'])$('#'+id).value='';inqWorkspacePage=1;inqRefreshWorkspace();}
-function openInqDetail(id){if(!inquiries.some(q=>q.id===id))return;inqDetailId=id;renderInqList();renderInqDetail();if(innerWidth<1100)$('#inqDetailClose')?.focus();}
-function toggleInqDetailExpanded(){const scroll=$('.inq-detail-body')?.scrollTop||0;inqDetailExpanded=!inqDetailExpanded;renderInqDetail();$('.inq-detail-body').scrollTop=scroll;$('#inqDetailExpand')?.focus();}
-function editInqDetail(id){openInqModal(id);if(inqDetailExpanded)document.querySelector('.modal-box')?.classList.add('modal-box--inq-expanded');}
-function closeInqDetail(){const id=inqDetailId;inqDetailId='';inqDetailExpanded=false;renderInqDetail();renderInqList();$('#inqListBody [data-view-i="'+CSS.escape(id)+'"]')?.focus();}
-let inqDetailHeightFrame=0;
-function updateInqDetailHeight(){
-  inqDetailHeightFrame=0;
-  const panel=$('#inqDetailPanel'),layout=$('#inqLayout');
-  if(!panel||panel.hidden||!panel.getClientRects().length)return;
-  $('#inqDetailBackdrop').hidden=innerWidth>=1100||inqDetailExpanded;
-  if(innerWidth<1100||inqDetailExpanded){panel.style.removeProperty('--inq-detail-height');return;}
-  const stickyTop=parseFloat(getComputedStyle(panel).top)||0;
-  const top=Math.max(stickyTop,layout.getBoundingClientRect().top);
-  const height=Math.max(0,Math.floor(innerHeight-top-16))+'px';
-  if(panel.style.getPropertyValue('--inq-detail-height')!==height)panel.style.setProperty('--inq-detail-height',height);
-}
-function scheduleInqDetailHeight(){if(!inqDetailHeightFrame)inqDetailHeightFrame=requestAnimationFrame(updateInqDetailHeight);}
-function renderInqDetail(){
-  const panel=$('#inqDetailPanel'),layout=$('#inqLayout'),q=inquiries.find(i=>i.id===inqDetailId),active=$('#view-enquiry .subtab.active')?.dataset.subtab;
-  const visible=!!q&&['list','board'].includes(active);panel.hidden=!visible;layout.classList.toggle('has-detail',visible);$('#inqDetailBackdrop').hidden=!visible||innerWidth>=1100;
-  if(!visible)inqDetailExpanded=false;
-  const expanded=visible&&inqDetailExpanded&&$('#view-enquiry').classList.contains('active');
-  layout.classList.toggle('is-expanded',expanded);panel.classList.toggle('is-expanded',expanded);document.body.classList.toggle('inq-detail-expanded',expanded);
-  $('#inqDetailBackdrop').hidden=!visible||innerWidth>=1100||expanded;
-  if(!visible){panel.innerHTML='';return;}
-  const linked=inquiryLinkedRows(q),latest=linked.quotes.slice().sort((a,b)=>(Number(b.updatedAt)||Number(b.createdAt))-(Number(a.updatedAt)||Number(a.createdAt)))[0],log=Array.isArray(q.followLog)?q.followLog:[];
-  const info=(label,value)=>`<dt>${label}</dt><dd>${esc(value||'未填写')}</dd>`;
-  let content='';
-  if(inqDetailTab==='status')content=inqStageHistoryHtml(q).replace('id="inqStageHistory"','id="inqDetailStageHistory"');
-  else if(inqDetailTab==='overview')content=`<section class="inq-detail-section"><h3>询盘概览</h3><dl>${info('产品需求',q.product)}${info('规格 / 型号',q.model)}${info('预计金额',q.expectedAmount?Number(q.expectedAmount).toLocaleString()+' '+(q.currency||'USD'):'')}${info('联系人',q.contactName)}${info('邮箱',q.contactEmail)}${info('电话',q.contactPhone)}${info('来源',q.source)}${info('收到日期',q.receivedAt)}${info('下次跟进',q.nextFollowAt)}</dl></section><div class="inq-detail-links"><button type="button" class="btn-ghost" data-detail-action="edit">编辑询盘信息</button><button type="button" class="btn-ghost" data-detail-action="client">查看客户档案</button><button type="button" class="btn-ghost" data-detail-action="ai">AI 跟进建议</button><button type="button" class="btn-ghost" data-detail-action="whatsapp">WhatsApp 沟通</button><button type="button" class="inq-text-action danger" data-detail-action="delete">删除询盘</button></div>`;
-  else if(inqDetailTab==='follow')content=`<section class="inq-detail-section"><h3>跟进记录 <small>${log.length} 条</small></h3>${log.length?`<ol class="inq-history-list">${log.slice().reverse().map(entry=>`<li><p>${esc(entry.content)}</p><small>${esc(inqFullDate(entry.at))} · ${esc(entry.by||'未记录')}</small>${entry.nextFollowAt?`<small>下次跟进：${esc(entry.nextFollowAt)}</small>`:''}</li>`).join('')}</ol>`:'<p class="muted">暂无新增跟进记录，点击“记录跟进”添加。</p>'}${q.chatLog?`<details class="inq-original-chat"><summary>原始沟通记录</summary><pre>${esc(inqPlainText(q.chatLog))}</pre></details>`:''}</section>`;
-  else content=`<section class="inq-detail-section"><h3>关联业务</h3>${linked.quotes.map(quote=>`<button class="inq-business-card" type="button" data-detail-quote="${esc(quote.id)}"><b>报价 ${esc(quote.quoteNo||'未填编号')}</b><span>${esc(quote.currency||'USD')} ${qtTotal(quote.items).toLocaleString()} · V${Number(quote.version)||1}</span><small>${esc(quote.status||'草稿')} · 查看报价 →</small></button>`).join('')}${linked.orders.map(order=>`<button class="inq-business-card" type="button" data-detail-order="${esc(order.id)}"><b>订单 ${esc(order.orderNo||'未填编号')}</b><span>${esc(order.currency||'USD')} ${Number(order.amount||0).toLocaleString()}</span><small>${esc(order.status||'待确认')} · 查看订单 →</small></button>`).join('')||(!linked.quotes.length?'<p class="muted">尚未关联报价或订单。</p>':'')}<div class="inq-detail-links"><button class="btn-ghost" type="button" data-detail-action="link">关联已有业务</button><button class="btn-ghost" type="button" data-detail-action="quote">＋ 新建报价</button></div></section>`;
-  panel.innerHTML=`<div class="inq-detail-head"><div><h3>${esc(displayClientName(q))}</h3>${inqStageBadge(q.status)}<p>${esc(q.country||'国家未填')} · 负责人：${esc(q.ownerName||'未分配')}</p></div><div class="inq-detail-window-actions"><button id="inqDetailExpand" class="inq-icon-action" type="button" aria-label="${inqDetailExpanded?'还原询盘详情':'放大询盘详情'}" title="${inqDetailExpanded?'还原':'放大'}" aria-pressed="${inqDetailExpanded}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">${inqDetailExpanded?'<path d="M8 8h12v12H8zM4 16V4h12"/>':'<path d="M8 4H4v4M16 4h4v4M20 16v4h-4M8 20H4v-4"/>'}</svg></button><button id="inqDetailClose" class="inq-icon-action" type="button" aria-label="关闭询盘详情">×</button></div></div><div class="inq-detail-actions"><button class="btn-primary" type="button" data-detail-action="follow">记录跟进</button><button class="btn-ghost" type="button" data-detail-action="stage">变更阶段</button><button class="inq-icon-action" type="button" data-detail-action="edit" aria-label="编辑询盘信息" title="编辑询盘信息">✎</button></div><div class="inq-detail-tabs" role="group" aria-label="询盘详情视图">${[['overview','概览'],['follow','跟进记录'],['status','状态记录'],['business','关联业务']].map(([key,label])=>`<button type="button" data-inq-detail-tab="${key}" class="${inqDetailTab===key?'active':''}" aria-pressed="${inqDetailTab===key}">${label}</button>`).join('')}</div><div class="inq-detail-body"><div class="inq-detail-primary">${content}</div><div class="inq-detail-support"><section class="inq-original-card"><h3>原始询盘</h3><dl>${info('来源',q.source)}${info('收到日期',q.receivedAt)}${info('产品需求',q.product)}${info('原始说明',q.notes)}</dl>${q.attachments?.length?`<div class="inq-original-files">${q.attachments.map(a=>{let safe=false;try{const u=new URL(a.url,location.origin);safe=['http:','https:'].includes(u.protocol);}catch{}return safe?`<a href="${esc(a.url)}" target="_blank" rel="noopener">附件：${esc(a.name||'查看文件')}</a>`:'';}).join('')}</div>`:''}</section>${latest?`<section class="inq-latest-quote"><h3>最新报价</h3><b>${esc(latest.quoteNo||'未填编号')}</b><span>${esc(latest.currency||'USD')} ${qtTotal(latest.items).toLocaleString()} · V${Number(latest.version)||1}</span><button class="inq-text-action" type="button" data-detail-quote="${esc(latest.id)}">查看报价 →</button></section>`:''}<p class="inq-preserve-note">联动更新阶段与报价信息，保留询盘需求和历史记录。</p></div></div>`;
-  $('#inqDetailClose').onclick=closeInqDetail;$('#inqDetailExpand').onclick=toggleInqDetailExpanded;
-  panel.querySelectorAll('[data-inq-detail-tab]').forEach(b=>b.onclick=()=>{inqDetailTab=b.dataset.inqDetailTab;renderInqDetail();panel.querySelector('[data-inq-detail-tab="'+inqDetailTab+'"]')?.focus();});
-  panel.querySelectorAll('[data-detail-quote]').forEach(b=>b.onclick=()=>openQuoteModal(b.dataset.detailQuote));panel.querySelectorAll('[data-detail-order]').forEach(b=>b.onclick=()=>openOrderDetail(b.dataset.detailOrder));
-  panel.querySelectorAll('[data-detail-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.detailAction;if(action==='edit')editInqDetail(q.id);if(action==='follow')openInqFollowModal(q.id);if(action==='stage')openInqStageModal(q.id);if(action==='link')openInquiryLinks(q.id);if(action==='quote')createQuoteFromInquiry(q);if(action==='client')window.openClientDetailByName(displayClientName(q));if(action==='ai')openAiAnalyze(q);if(action==='whatsapp')openWaForInquiry(q.id);if(action==='delete'){if(!confirm('确认删除该询盘？'))return;const response=await api('/api/inquiries/'+q.id,{method:'DELETE'});if(!response.ok)return toast('删除失败');inqDetailId='';await loadInquiries();toast('询盘已删除');}});
-  scheduleInqDetailHeight();
-}
-function openInqStageModal(id){
-  const q=inquiries.find(i=>i.id===id);if(!q)return;const before=q.status||'新询盘',actor=currentUser?.id;
-  openModal('变更询盘阶段',`<p>${esc(displayClientName(q))} · 当前 ${esc(before)}</p><div class="field"><label>新阶段</label><select name="newStage" data-no-combo>${INQ_STATUSES.includes(before)?'':`<option value="${esc(before)}" selected>${esc(before)}（历史阶段）</option>`}${INQ_STATUSES.map(s=>`<option ${s===before?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label>变更原因 *</label><textarea name="stageReason" required placeholder="说明本次阶段变更的原因"></textarea></div>`);
-  let saving=false;$('#modalForm').onsubmit=async e=>{e.preventDefault();if(saving||currentUser?.id!==actor)return;const data=new FormData(e.target),status=String(data.get('newStage')),reason=String(data.get('stageReason')||'').trim();if(status===before)return toast('请选择不同阶段');if(!reason)return toast('请填写阶段变更原因');saving=true;try{const r=await api('/api/inquiries/'+id,{method:'PUT',body:JSON.stringify({status,lastStageReason:reason})}),result=await r.json();if(!r.ok)throw Error(result.error||'保存失败');if(currentUser?.id!==actor)return;closeModal();inqDetailTab='status';await loadInquiries();toast('阶段已更新，原因已保存');}catch(error){toast(error.message);}finally{saving=false;}};
-}
-function openInqFollowModal(id){
-  const q=inquiries.find(i=>i.id===id);if(!q)return;const actor=currentUser?.id;
-  openModal('记录询盘跟进',`<p>${esc(displayClientName(q))} · ${esc(q.product||'未填需求')}</p><div class="field"><label>跟进内容 *</label><textarea name="followContent" rows="5" required placeholder="记录沟通结果、客户反馈或下一步安排"></textarea></div><div class="field"><label>下次跟进日期</label><input name="followDate" type="date" value="${esc(q.nextFollowAt||'')}" /></div><p class="muted">跟进记录单独保存，原始需求和沟通内容继续保留。</p>`);
-  let saving=false;$('#modalForm').onsubmit=async e=>{e.preventDefault();if(saving||currentUser?.id!==actor)return;const data=new FormData(e.target),content=String(data.get('followContent')||'').trim();if(!content)return toast('请填写跟进内容');saving=true;try{const r=await api('/api/inquiries/'+id+'/followups',{method:'POST',body:JSON.stringify({content,nextFollowAt:String(data.get('followDate')||'')})}),result=await r.json();if(!r.ok)throw Error(result.error||'保存失败');if(currentUser?.id!==actor)return;closeModal();inqDetailTab='follow';inqDetailId=id;await loadInquiries();toast('跟进记录已保存');}catch(error){toast(error.message);}finally{saving=false;}};
-}
-let inqDraftBadgeRequest=0;
-async function inqRefreshDraftBadge(){const actor=currentUser?.id,request=++inqDraftBadgeRequest;if(!actor)return;try{const r=await api('/api/inquiry-drafts?status=pending&page=1&limit=1'),data=await r.json();if(r.ok&&currentUser?.id===actor&&request===inqDraftBadgeRequest)$('#inqDraftCount').textContent=String(data.total||0);}catch{}}
-(function initInquiryWorkspace(){
-  $('#inqPageSize').onchange=e=>{inqWorkspacePageSize=Number(e.target.value);inqWorkspacePage=1;try{localStorage.setItem('ftw.inqPageSize',String(inqWorkspacePageSize));}catch{}renderInqList();};
-  ['inqOwnerFilter','inqSourceFilter','inqFollowScope','inqCountryFilter','inqReceivedFrom','inqReceivedTo'].forEach(id=>$('#'+id).onchange=()=>{inqWorkspacePage=1;inqRefreshWorkspace();});
-  $('#inqSearch').addEventListener('input',()=>{inqWorkspacePage=1;inqRefreshWorkspace();});
-  $('#inqMoreFilters').onclick=()=>{const advanced=$('#inqAdvancedFilters');advanced.hidden=!advanced.hidden;$('#inqMoreFilters').setAttribute('aria-expanded',String(!advanced.hidden));};
-  $('#inqResetFilters').onclick=inqResetWorkspaceFilters;$('#inqClearSelection').onclick=()=>{inqSelected.clear();renderInqList();};
-  $('#inqImport').onclick=()=>{openModal('导入询盘记录','<div class="inq-import-options"><p>选择来源，保留原文后核对询盘信息。</p><button type="button" class="btn-primary" id="inqImportPaste">粘贴邮件 / 聊天 / RFQ 原文</button><button type="button" class="btn-ghost" id="inqImportDrafts">核对已接入的来源草稿</button></div>',{plain:true,noFooter:true});$('#inqImportPaste').onclick=()=>openInqModal();$('#inqImportDrafts').onclick=()=>{closeModal();$('#view-enquiry [data-subtab=draft]').click();};};
-  $('#inqDetailBackdrop').onclick=closeInqDetail;
-  $('#inqListBody').addEventListener('click',e=>{const owner=e.target.closest('[data-owner-f]');if(owner){inqOwnerFilterQ=inqOwnerFilterQ===owner.dataset.ownerF?'':owner.dataset.ownerF;inqWorkspacePage=1;inqRefreshWorkspace();}});
-  window.addEventListener('ftw:inqViewChanged',event=>{const pipeline=['list','board'].includes(event.detail);$('#inqFilterControls').hidden=!pipeline;renderInqDetail();});
-  window.addEventListener('ftw:inquiriesChanged',()=>{inqPopulateFilters();renderInqList();inqRefreshDraftBadge();});
-  window.addEventListener('ftw:dataReady',()=>{inqPopulateFilters();renderInqList();inqRefreshDraftBadge();});
-  window.addEventListener('resize',scheduleInqDetailHeight);
-  document.addEventListener('scroll',scheduleInqDetailHeight,{capture:true,passive:true});
-  const detailSizeObserver=new ResizeObserver(scheduleInqDetailHeight);
-  detailSizeObserver.observe($('#inqLayout'));
-  detailSizeObserver.observe($('#view-enquiry .inq-page-head'));
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&inqDetailId&&!$('#modal').classList.contains('open')){event.preventDefault();if(inqDetailExpanded)toggleInqDetailExpanded();else closeInqDetail();}});
-  const previousViewActivated=window.onViewActivated;
-  window.onViewActivated=function(view){
-    if(view!=='enquiry'){inqDetailId='';inqDetailExpanded=false;renderInqDetail();}
-    else renderInqDetail();
-    if(typeof previousViewActivated==='function')return previousViewActivated(view);
+  async function loadBadges(){var actor=currentUser?.id,sequence=++badgeRequest;if(!actor)return;try{var r=await api('/api/inquiry-drafts?status=pending&page=1&limit=1'),data=await r.json();if(r.ok&&actor===currentUser?.id&&sequence===badgeRequest)$('#draftBtn .n').textContent=String(data.total||0)}catch{}}
+  function flags(q){var f={},active=colOf(q.s)<4;if(active&&q.nf){var n=dd(TODAY,q.nf);f.late=n<0;f.today=n===0;}
+    var progress=[q.lf,...CP.logs(q.raw.stageLog).map(x=>CP.day(x.at)),...CP.logs(q.raw.followLog).map(x=>CP.day(x.at))].filter(Boolean).sort().at(-1)||q.d;
+    f.age=dd(progress,TODAY);f.old=active&&!!progress&&f.age>30;
+    f.nolink=['已报价','等回复','谈判中'].includes(q.s)&&q.nq===0;
+    return f;
+  }
+  var st={view:'board',q:'',owner:'',src:'',fl:'',stage:-1,sel:{},state:'ok',expand:{},sort:'d:desc',page:1,per:20};
+  var mq=matchMedia('(max-width:820px)');
+
+  $('#moreBtn').insertAdjacentHTML('afterbegin',ic('more'));
+  $('#aiBtn').insertAdjacentHTML('afterbegin',ic('spark'));
+  $('#addBtn').insertAdjacentHTML('afterbegin',ic('plus'));
+  $('[data-v="board"]',$('#viewSeg')).insertAdjacentHTML('afterbegin',ic('board','width:15px;height:15px;margin-right:6px;vertical-align:-3px'));
+  $('[data-v="list"]',$('#viewSeg')).insertAdjacentHTML('afterbegin',ic('rows','width:15px;height:15px;margin-right:6px;vertical-align:-3px'));
+  $('#bX').innerHTML=ic('x');
+
+  function opts(id,label,field){var map=new Map();IQ.forEach(q=>{var v=q[field]||'未填写';map.set(v,(map.get(v)||0)+1)});$('#'+id).innerHTML='<option value="">'+label+'</option>'+[...map].sort((a,b)=>b[1]-a[1]).map(([v,n])=>'<option value="'+esc(v)+'">'+esc(field==='oid'?(IQ.find(q=>q.oid===v)?.o||'未分配'):v)+'（'+n+'）</option>').join('')}
+  function refreshOptions(){opts('fOwner','全部负责人','oid');opts('fSrc','全部来源','src');var c=$('#eqp-country'),value=c.value;c.innerHTML='<option value="">全部国家</option>'+[...new Set(IQ.map(q=>q.k).filter(Boolean))].sort().map(k=>'<option>'+esc(k)+'</option>').join('');c.value=value;}
+  function base(ignoreWarning){var q=st.q.trim().toLowerCase();return IQ.filter(function(x){
+    if(st.owner&&x.oid!==st.owner)return false;
+    if(st.src&&(x.src||'未填写')!==st.src)return false;
+    if(window.inqClientIdFilter){if(x.raw.clientId){if(String(x.raw.clientId)!==String(window.inqClientIdFilter))return false;}else{var cl=CP.allClients().find(c=>c.id===window.inqClientIdFilter);if(!cl||!CP.matches(cl,x.raw))return false;}}
+    else if(window.inqClientFilter&&CP.key(x.c)!==CP.key(window.inqClientFilter))return false;
+    if(typeof inqOwnerFilterQ!=='undefined'&&inqOwnerFilterQ&&x.o!==inqOwnerFilterQ&&x.oid!==inqOwnerFilterQ)return false;
+    if($('#eqp-country').value&&x.k!==$('#eqp-country').value)return false;
+    if($('#eqp-from').value&&(!x.d||x.d<$('#eqp-from').value))return false;
+    if($('#eqp-to').value&&(!x.d||x.d>$('#eqp-to').value))return false;
+    if(st.fl&&!ignoreWarning){var f=flags(x);if(st.fl==='due'&&!(f.late||f.today))return false;if(st.fl==='none'&&(x.nf||colOf(x.s)>=4))return false;if(st.fl==='old'&&!f.old)return false;if(st.fl==='nolink'&&!f.nolink)return false}
+    if(q&&[x.c,x.p,x.m,x.k].join(' ').toLowerCase().indexOf(q)<0)return false;
+    return true})}
+
+  function renderTop(L){
+    var all=IQ.length, mx=Math.max(1,...S.map(function(s,i){return IQ.filter(function(q){return colOf(q.s)===i}).length}));
+    $('#stages').innerHTML=S.map(function(s,i){var A=L.filter(function(q){return colOf(q.s)===i}),sum=amountSum(A).value,late=A.filter(function(q){return flags(q).late}).length;
+      return '<button class="stg" style="--c:'+s.c+'" data-stage="'+i+'" aria-pressed="'+(st.stage===i)+'"><span class="k"><i></i>'+s.k+(late?'<span class="flag warn" title="跟进逾期">'+late+' 逾期</span>':'')+'</span><span class="v">'+A.length+'</span><span class="a'+(sum?'':' none')+'">'+(sumLabel(A)||'未估金额')+'</span><span class="bar" aria-hidden="true"><b style="width:'+(A.length/mx*100)+'%"></b></span>'+'</button>'}).join('');
+    var open=L.filter(function(q){var c=colOf(q.s);return c>=1&&c<=3}), openSum=amountSum(open).value;
+    var context=base(true);var due=context.filter(function(q){var f=flags(q);return f.late||f.today}).length, old=context.filter(function(q){return flags(q).old}).length, nolink=context.filter(function(q){return flags(q).nolink}).length;
+    $('#sum').innerHTML='<div class="big"><span>报价后在谈金额</span><b>'+ (sumLabel(open)||'¥0')+'</b><small>已报价 + 等回复 + 谈判中 · '+open.length+' 条 · 按当前汇率折合 CNY</small></div><ul>'+
+      [['due','跟进到期 / 逾期',due,'var(--danger)'],['old','超 30 天未推进',old,'#E08A1E'],['nolink','报价后未关联报价单',nolink,'var(--c-wait)']].map(function(r){return '<li><button data-fl="'+r[0]+'" aria-pressed="'+(st.fl===r[0])+'"><span class="dotw" style="background:'+r[3]+'"></span>'+r[1]+' <b>'+r[2]+'</b>'+ic('arrow')+'</button></li>'}).join('')+'</ul>';
+  }
+
+  function card(q){var f=flags(q),c=colOf(q.s);
+    var pills=[];
+    if(f.late)pills.push('<span class="pill late">'+ic('clock')+'逾期 '+dd(q.nf,TODAY)+' 天</span>');
+    else if(f.today)pills.push('<span class="pill soon">'+ic('clock')+'今天跟进</span>');
+    if(f.old)pills.push('<span class="pill old">'+f.age+' 天未推进</span>');
+    if(c>=1&&c<=4)pills.push(q.nq||q.no?'<span class="pill ok">'+ic('link')+'报价 '+q.nq+(q.no?' · 订单 '+q.no:'')+'</span>':'<span class="pill no">未关联报价</span>');
+    return '<div class="ic'+(f.late?' late':'')+'" role="button" tabindex="0" draggable="true" data-open="'+q.i+'" aria-label="'+esc(q.c)+'，'+esc(q.s)+(f.late?'，跟进逾期':'')+'"><div class="t"><b>'+esc(q.c||'未命名客户')+'</b>'+av(q.o,1)+'</div>'+
+      '<div class="p"><span>'+esc(q.k||'—')+' · </span>'+esc(q.p||'未说明产品')+'</div>'+(q.why&&c>=1?'<div class="why" title="'+esc(q.why)+'">'+esc(q.why)+'</div>':'')+
+      '<div class="f"><span class="amt'+(q.hasAmount?'':' none')+'">'+(q.hasAmount?amt(q):q.invalidAmount?'金额待核对':'未估金额')+'</span><span class="age">'+(q.d?q.d.slice(5)+' 收到':'')+'</span></div>'+(pills.length?'<div class="f">'+pills.join('')+'</div>':'')+'</div>'}
+
+  function sortBoard(A){return A.sort(function(a,b){var fa=flags(a),fb=flags(b);if(fa.late!==fb.late)return fa.late?-1:1;return a.d<b.d?1:a.d>b.d?-1:0})}
+
+  function render(){
+    refreshData();st.state=loadState==='error'&&!IQ.length?'error':(loadState==='pending'||window.__crmInquiryDataOwner!==account)&&!IQ.length?'loading':'ok';
+    var dirty=st.q||st.owner||st.src||st.fl||st.stage>=0||window.inqClientFilter||window.inqClientIdFilter||$('#eqp-country').value||$('#eqp-from').value||$('#eqp-to').value;
+    $('#fbar').classList.toggle('dirty',!!dirty);$('#qWrap').classList.toggle('has',!!st.q);
+    [['fOwner','owner'],['fSrc','src'],['fFl','fl']].forEach(function(p){var el=$('#'+p[0]);el.value=st[p[1]];el.classList.toggle('on',!!st[p[1]])});
+    var moreN=[st.src,$('#eqp-country').value,$('#eqp-from').value,$('#eqp-to').value].filter(Boolean).length;
+    $('#fmoreBtn').classList.toggle('on',moreN>0);
+    $('#fmoreBtn').innerHTML='更多筛选'+(moreN?'<span class="n">'+moreN+'</span>':'');
+    $('#fmoreBtn').setAttribute('aria-expanded',$('#fmore').classList.contains('open'));
+    $('#fmoreInfo').textContent=moreN?'已应用 1 个筛选条件':'未使用更多筛选';
+    $$('#viewSeg button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.v===st.view)});
+    var L=base(); renderTop(L);
+    var won=IQ.filter(function(q){return q.s==='成交'}).length;
+    $('#headSub').innerHTML='<b>'+IQ.length+'</b> 条询盘 · 本月收到 <b>'+IQ.filter(function(q){return q.d>=(TODAY.slice(0,7)+'-01')&&q.d<=TODAY}).length+'</b> 条 · 已成交 <b>'+won+'</b> 条，成交率 <b>'+pct(won,IQ.length)+'</b>';
+    var V=$('#view');
+    if(auxMode)return;
+    if(st.state==='loading'){$('#count').textContent='加载中…';V.innerHTML='<div class="board">'+S.map(function(s){return '<div class="col" style="--c:'+s.c+'"><div class="col-h"><i></i><h3>'+s.k+'</h3></div><div class="col-b">'+[1,2,3].map(function(){return '<div class="sk-c"><span class="sk" style="width:70%;height:13px"></span><span class="sk" style="width:95%;height:10px"></span><span class="sk" style="width:40%;height:12px"></span></div>'}).join('')+'</div></div>'}).join('')+'</div>';return}
+    if(st.state==='error'){$('#count').textContent='';V.innerHTML='<section class="card"><div class="err" role="alert">'+ic('alert')+'<h3>询盘没有加载出来</h3><p>暂时无法读取询盘，请重试。已保存的业务记录不会被此页面覆盖。</p><button class="btn" data-retry>'+ic('refresh')+'重新加载</button></div></section>';return}
+    var shown=st.stage>=0?L.filter(function(q){return colOf(q.s)===st.stage}):L;
+    $('#count').innerHTML='共 <b>'+shown.length+'</b> 条'+(shown.length!==IQ.length?' / '+IQ.length:'');
+    if(!shown.length){V.innerHTML='<section class="card"><div class="empty">'+ic('search')+'<h3>没有符合条件的询盘</h3><p>换个关键词，或者放宽筛选条件。</p><button class="btn" data-reset>清空筛选</button></div></section>';renderBatch();return}
+    if(st.view==='board'){
+      V.innerHTML='<div class="board" id="eqp-board">'+S.concat(legacy.map(k=>({k,c:'var(--c-lost)',t:'t-lost'}))).map(function(s,i){
+        if(st.stage>=0&&st.stage!==i)return '';
+        var A=sortBoard(L.filter(function(q){return colOf(q.s)===i})),sum=amountSum(A).value,lim=st.expand[i]?A.length:8;
+        return '<section class="col" style="--c:'+s.c+'" data-col="'+i+'" aria-label="'+s.k+'，'+A.length+' 条"><div class="col-h"><i></i><h3>'+s.k+'</h3><span class="n">'+A.length+'</span><span class="amt">'+(sumLabel(A)||'')+'</span></div><div class="col-b">'+(A.length?A.slice(0,lim).map(card).join(''):'<div class="nil">暂无询盘<br>可把卡片拖到这里</div>')+'</div>'+(A.length>lim?'<button class="more" data-expand="'+i+'">再显示 '+(A.length-lim)+' 条</button>':'')+'</section>'}).join('')+'</div>';
+      $$('.batch').forEach(function(b){b.classList.remove('show')});
+    }else{
+      var sk=st.sort.split(':'),key=sk[0],dir=sk[1]==='desc'?-1:1;
+      var R=shown.slice().sort(function(a,b){var x,y;if(key==='a'){x=cny(a)??-Infinity;y=cny(b)??-Infinity}else if(key==='s'){x=colOf(a.s);y=colOf(b.s)}else{x=a[key]||(dir>0?'9999':'');y=b[key]||(dir>0?'9999':'')}return x<y?-dir:x>y?dir:0});
+      var pages=Math.max(1,Math.ceil(R.length/st.per));if(st.page>pages)st.page=pages;var rows=R.slice((st.page-1)*st.per,st.page*st.per);
+      function th(k,l,cls){var on=key===k;return '<th class="'+(cls||'')+'"'+(on?' aria-sort="'+(dir>0?'ascending':'descending')+'"':'')+'><button data-sort="'+k+'">'+l+ic('sort')+'</button></th>'}
+      var allOn=rows.every(function(q){return st.sel[q.i]});
+      V.innerHTML='<section class="card lst"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="ck"><input type="checkbox" id="eqp-ckAll" aria-label="选择本页" '+(allOn?'checked':'')+'></th><th>客户</th><th>需求产品</th>'+th('s','阶段')+th('a','预计金额','r')+'<th>负责人</th>'+th('d','收到')+th('nf','下次跟进')+'<th>报价 / 订单</th></tr></thead><tbody>'+
+        rows.map(function(q){var f=flags(q),n=q.nf?dd(TODAY,q.nf):null;return '<tr data-open="'+q.i+'" class="'+(st.sel[q.i]?'sel':'')+'"><td class="ck"><input type="checkbox" data-ck="'+q.i+'" aria-label="选择 '+esc(q.c)+'" '+(st.sel[q.i]?'checked':'')+'></td><td><div class="who"><b>'+esc(q.c||'未命名客户')+'</b><span>'+esc(q.k||'—')+' · '+esc(q.src||'未填写')+'</span></div></td><td><span class="p2" title="'+esc(q.p)+'">'+esc(q.p||'未说明产品')+'</span></td><td><span class="tag '+tagOf(q.s)+'">'+esc(q.s)+'</span></td><td class="r">'+(q.hasAmount?'<span class="dt">'+amt(q)+'</span>':'<span class="dim">—</span>')+'</td><td>'+av(q.o)+'</td><td><span class="dt">'+esc((q.d||'').slice(5))+'<small>'+q.age+' 天前</small></span></td><td>'+(q.nf?'<span class="dt'+(n<0?' late':n===0?' soon':'')+'">'+q.nf.slice(5)+'<small>'+(n<0?'逾期 '+(-n)+' 天':n===0?'今天':n+' 天后')+'</small></span>':'<span class="dim">未安排</span>')+'</td><td>'+(q.nq||q.no?'<span class="pill ok">报价 '+q.nq+' · 订单 '+q.no+'</span>':'<span class="dim">—</span>')+'</td></tr>'}).join('')+'</tbody></table></div>'+
+        '<div class="pager"><span>第 <b class="num">'+((st.page-1)*st.per+1)+'–'+Math.min(R.length,st.page*st.per)+'</b> 条，共 '+R.length+' 条</span><span class="sp"></span><div class="pg"><button data-pg="'+(st.page-1)+'" '+(st.page<=1?'disabled':'')+' aria-label="上一页">‹</button>'+Array.apply(null,{length:pages}).map(function(_,i){return '<button data-pg="'+(i+1)+'"'+(i+1===st.page?' aria-current="page"':'')+'>'+(i+1)+'</button>'}).join('')+'<button data-pg="'+(st.page+1)+'" '+(st.page>=pages?'disabled':'')+' aria-label="下一页">›</button></div></div></section>';
+      renderBatch();
+    }
+  }
+  function positionBatch(){var b=$('#batch'),r=root.getBoundingClientRect();b.style.left=Math.max(b.offsetWidth/2+14,Math.min(innerWidth-b.offsetWidth/2-14,r.left+r.width/2))+'px';}
+  function renderBatch(){inqSelected.clear();Object.keys(st.sel).forEach(id=>inqSelected.add(id));var n=Object.keys(st.sel).length;$('#bN').textContent=n;$('#batch').classList.toggle('show',n>0&&st.view==='list');positionBatch()}
+
+  function moveTo(q,status){if(q&&q.s!==status)return window.crmChangeInquiryStage(q.i,status);}
+  // drawer
+  var dr=$('#drawer'),drBg=$('#drBg'),opener=null,cur=null;
+  dr.inert=true;var followBusy=new Set();
+  function openDr(q,keep){
+    if(!q)return;cur=q;if(!keep)opener=document.activeElement;var f=flags(q),c=colOf(q.s),raw=q.raw,scroll=$('.dr-b',dr)?.scrollTop||0;
+    var draft=drafts.get(q.i)||{content:'',date:q.nf&&q.nf>TODAY?q.nf:CP.addDays(TODAY,3)};drafts.set(q.i,draft);
+    function kv(label,value,cls){return '<div class="'+(cls||'')+'"><dt>'+label+'</dt><dd>'+(value||'<span class="dim">未填写</span>')+'</dd></div>'}
+    var timeline=[];
+    if(q.nf)timeline.push({date:q.nf,text:'计划跟进'+(f.late?' · 已逾期 '+dd(q.nf,TODAY)+' 天':''),cls:f.late?'late':'next',at:Date.parse(q.nf+'T23:59:59Z')});
+    for(var entry of CP.logs(raw.followLog))timeline.push({date:CP.day(entry.at),text:entry.content,actor:entry.by,at:Number(entry.at)||0});
+    for(var entry of CP.logs(raw.stageLog))timeline.push({date:CP.day(entry.at),text:(entry.from||'建立询盘')+' → '+entry.to+' · '+(entry.reason||'历史记录未填写原因'),actor:entry.by,at:Number(entry.at)||0});
+    timeline.sort((a,b)=>b.at-a.at);if(q.d)timeline.push({date:q.d,text:'收到询盘 · 来源 '+(q.src||'未填写')});
+    var steps=['新询盘','已报价','等回复','谈判中','成交','暂缓','无效'];if(q.s==='输单')steps.push('输单');
+    var client=CP.allClients().find(c=>q.cid?c.id===q.cid:CP.matches(c,raw));
+    var business='<button type="button" data-enquiry-action="links"><b>'+(q.nq||q.no?'报价 '+q.nq+' 份 · 订单 '+q.no+' 份':'还没有关联报价单')+'</b><span class="amt">'+ic('arrow','width:15px;height:15px;color:var(--muted)')+'</span><span>'+(q.nq||q.no?'查看报价与订单，或补关联历史记录':(['已报价','等回复','谈判中'].includes(q.s)?'请关联对应报价，便于核对业务进展':'报价后在这里关联'))+'</span></button>';
+    business+=q.links.quotes.map(x=>'<button type="button" data-linked-quote="'+esc(x.id)+'"><b>报价 '+esc(x.quoteNo||'未填编号')+'</b><span class="amt">'+esc(x.status||'草稿')+'</span><span>'+esc(x.currency||'USD')+' '+qtTotal(x.items).toLocaleString()+'</span></button>').join('');
+    business+=q.links.orders.map(x=>'<button type="button" data-linked-order="'+esc(x.id)+'"><b>订单 '+esc(x.orderNo||'未填编号')+'</b><span class="amt">'+esc(x.status||'待确认')+'</span><span>'+esc(x.currency||'USD')+' '+Number(x.amount||0).toLocaleString()+'</span></button>').join('');
+    dr.innerHTML='<div class="dr-h"><button class="btn btn-ghost icon-btn x" id="eqp-drX" aria-label="关闭">'+ic('x')+'</button><div class="eb"><span class="tag '+tagOf(q.s)+'">'+esc(q.s)+'</span><span>'+esc(q.src||'未填写来源')+' · '+(q.d?q.age+' 天前收到':'收到日期未填写')+'</span>'+(f.late?'<span class="pill late">跟进逾期</span>':'')+'</div><h2 id="eqp-drTitle">'+esc(q.c||'未命名客户')+'</h2><div class="sub">'+esc(q.k||'—')+' · '+esc(q.p||'未说明产品')+'</div><div class="stepper" role="group" aria-label="切换阶段">'+steps.map((s,i)=>'<button type="button" data-move="'+s+'" class="'+(i>=5?'alt':i<c&&c<5?'done':'')+'"'+(q.s===s?' aria-current="step"':'')+'>'+s+'</button>').join('')+'</div><div class="dr-acts"><button type="button" class="btn btn-pri" data-focus-note>'+ic('pen')+'写跟进</button><button type="button" class="btn" data-enquiry-action="quote">'+ic('file')+(q.nq?'查看报价':'生成报价')+'</button><button type="button" class="btn" data-enquiry-action="whatsapp">'+ic('chat')+'WhatsApp</button><button type="button" class="btn" data-enquiry-action="edit">编辑</button></div></div><div class="dr-b"><section class="dr-sec"><h3>需求</h3><dl class="kv">'+kv('产品',esc(q.p),'full')+kv('型号 / 规格',esc(q.m))+kv('预计金额',q.hasAmount?'<span class="num" style="font:700 16px var(--num)">'+amt(q)+'</span>'+(q.cur!=='CNY'?'<br><small class="dim">'+(cny(q)==null?'汇率未就绪，待折算':'≈ ¥'+Math.round(cny(q)).toLocaleString('zh-CN'))+'</small>':''):q.invalidAmount?'金额待核对':'')+kv('样品',esc(q.sample))+kv('负责人',av(q.o))+'</dl>'+(raw.notes||raw.chatLog?'<details class="crm-original"><summary>原始询盘与沟通</summary>'+ (raw.notes?'<pre>'+esc(raw.notes)+'</pre>':'')+(raw.chatLog?'<pre>'+esc(typeof raw.chatLog==='string'?raw.chatLog:JSON.stringify(raw.chatLog,null,2))+'</pre>':'')+'</details>':'')+'</section><section class="dr-sec"><h3>关联报价 / 订单</h3><div class="mini">'+business+'<button type="button" data-enquiry-action="client"><b>'+(client?'客户档案：'+esc(client.company):'未关联客户档案')+'</b><span class="amt">'+ic('arrow','width:15px;height:15px;color:var(--muted)')+'</span><span>'+(client?'打开客户资料':'去客户资料中建档或匹配')+'</span></button></div></section><section class="dr-sec"><h3>跟进记录 <span class="n">'+(CP.logs(raw.followLog)).length+'</span></h3><textarea class="note-in" id="eqp-note" maxlength="8000" placeholder="客户回复了什么？下一步做什么？">'+esc(draft.content)+'</textarea><div class="note-f"><label class="hint">下次跟进 <input type="date" class="in in-num" id="eqp-nextD" value="'+esc(draft.date)+'" style="height:30px;width:auto;padding:0 8px;margin-left:4px"></label><button class="btn btn-pri" id="eqp-saveNote" '+(!draft.content.trim()||followBusy.has(q.i)?'disabled':'')+'>保存跟进</button></div><p class="crm-save-error" id="eqp-noteError" role="status">'+esc(draft.error||'')+'</p><ul class="tl" style="margin-top:16px">'+timeline.map(t=>'<li class="'+(t.cls||'')+'"><time>'+esc(t.date||'日期未记录')+(t.actor?' · '+esc(t.actor):'')+'</time><span class="crm-timeline-content">'+esc(t.text)+'</span></li>').join('')+'</ul></section></div>';
+    if(!keep){dr.classList.add('open');drBg.classList.add('open');dr.setAttribute('aria-hidden','false');dr.inert=!!document.querySelector('#modal.open');document.body.dataset.crmDrawerOpen='true';setTimeout(()=>$('#drX').focus(),30)}else $('.dr-b',dr).scrollTop=scroll;
+  }
+  function closeDr(){dr.classList.remove('open');drBg.classList.remove('open');dr.setAttribute('aria-hidden','true');dr.inert=true;cur=null;delete document.body.dataset.crmDrawerOpen;if(opener&&document.body.contains(opener))opener.focus({preventScroll:true})}
+  function act(label,button){
+    if(label==='异常登记')return setView('exception');if(label==='草稿箱')return setView('draft');
+    if(['AI 智能登记','新增询盘','AI 设置','MCP 接入'].includes(label))return;
+    if(label==='同步关联状态')return reconcileInquiryLinks(button);
+    if(label==='导入记录'){openModal('导入询盘记录','<p>先保留来源原文，再核对并登记。</p><button type="button" class="btn-primary" id="crmImportPaste">粘贴邮件 / 聊天原文</button><button type="button" class="btn-ghost" id="crmImportDraft">核对来源草稿</button>',{plain:true,noFooter:true});document.getElementById('crmImportPaste').onclick=()=>openInqModal();document.getElementById('crmImportDraft').onclick=()=>{closeModal();$('#draftBtn').click()};return;}
+    var actions={'批量改阶段':'stage','批量分配负责人':'owner','批量删除':'delete'};if(actions[label])return CP.batch('inquiries',actions[label],Object.keys(st.sel),async(ok,failed)=>{ok.forEach(id=>delete st.sel[id]);await loadInquiries().catch(()=>{});render()});
+  }
+  window.crmChangeInquiryStage=function(id,desired,opts={}){
+    var raw=CP.allInquiries().find(q=>q.id===id);if(!raw)return Promise.resolve(false);var before=raw.status||'新询盘';if(before===desired)return Promise.resolve(true);
+    return new Promise(resolve=>{
+      var actor=currentUser?.id,done=false,saving=false;
+      openModal('变更询盘阶段','<p>'+esc(typeof displayClientName==='function'?displayClientName(raw):raw.clientName)+' · 当前 '+esc(before)+'</p><div class="field"><label>新阶段</label><select name="newStage" data-no-combo>'+CP.options((INQ_STATUSES.includes(before)?INQ_STATUSES:[before,...INQ_STATUSES]).map(x=>[x,x]),desired||before)+'</select></div><div class="field full"><label>变更原因 *</label><textarea name="stageReason" required maxlength="8000" placeholder="说明本次阶段变更的原因"></textarea></div><p id="crmStageResult" class="crm-save-error field full" role="status"></p>');
+      var form=document.getElementById('modalForm'),result=document.getElementById('crmStageResult');
+      function cleanup(){document.removeEventListener('ftw:modal-close',cancel);document.removeEventListener('ftw:modal-replace',cancel)}
+      function cancel(){if(!done){done=true;cleanup();opts.resetEl?.(before);resolve(false)}}
+      document.addEventListener('ftw:modal-close',cancel);document.addEventListener('ftw:modal-replace',cancel);
+      form.onsubmit=async e=>{e.preventDefault();if(saving||currentUser?.id!==actor)return;var fd=new FormData(form),reason=String(fd.get('stageReason')||'').trim(),status=String(fd.get('newStage')||'');if(!reason)return toast('请填写阶段变更原因');if(status===before)return toast('请选择不同阶段');saving=true;CP.modalBusy(form,true);
+        try{var saved=await CP.request('/api/inquiries/'+encodeURIComponent(id),{status,lastStageReason:reason},'PUT');if(currentUser?.id!==actor)return;Object.assign(raw,saved);done=true;cleanup();if(document.getElementById('crmStageResult')===result)closeModal();await loadInquiries().catch(()=>{});render();resolve(true);toast('阶段已更新，原因已保存');}
+        catch(error){result.textContent=error.message;}
+        finally{saving=false;CP.modalBusy(form,false)}
+      };
+    });
   };
-  renderInqStageSummary();
+  window.openInqStageModal=(id,desired)=>window.crmChangeInquiryStage(id,desired);
+  window.openInqFollowModal=function(id){
+    var q=CP.allInquiries().find(x=>x.id===id);if(!q)return;var actor=currentUser?.id;
+    openModal('记录询盘跟进','<p>'+esc(typeof displayClientName==='function'?displayClientName(q):q.clientName)+'</p><div class="field full"><label>跟进内容 *</label><textarea name="followContent" required maxlength="8000"></textarea></div><div class="field"><label>下次跟进日期</label><input type="date" name="followDate" value="'+esc(q.nextFollowAt||'')+'"></div><p id="crmFollowResult" class="crm-save-error field full" role="status"></p>');
+    var form=document.getElementById('modalForm'),result=document.getElementById('crmFollowResult'),saving=false;
+    form.onsubmit=async e=>{e.preventDefault();if(saving||currentUser?.id!==actor)return;var fd=new FormData(form),content=String(fd.get('followContent')||'').trim();if(!content)return toast('请填写跟进内容');saving=true;CP.modalBusy(form,true);try{var saved=await CP.request('/api/inquiries/'+encodeURIComponent(id)+'/followups',{content,nextFollowAt:String(fd.get('followDate')||'')});if(currentUser?.id!==actor)return;Object.assign(q,saved);if(document.getElementById('crmFollowResult')===result)closeModal();await loadInquiries().catch(()=>{});render();toast('跟进记录已保存')}catch(error){result.textContent=error.message}finally{saving=false;CP.modalBusy(form,false)}};
+  };
+  drBg.addEventListener('click',closeDr);
+  dr.addEventListener('input',e=>{if(!cur)return;var draft=drafts.get(cur.i);if(e.target.id==='eqp-note')draft.content=e.target.value;if(e.target.id==='eqp-nextD')draft.date=e.target.value;$('#saveNote').disabled=!draft.content.trim()||followBusy.has(cur.i)});
+  dr.addEventListener('click',async e=>{
+    if(e.target.closest('#eqp-drX'))return closeDr();if(e.target.closest('[data-focus-note]'))return $('#note').focus();
+    var q=cur;if(!q)return;var mv=e.target.closest('[data-move]');if(mv)return moveTo(q,mv.dataset.move);
+    var quote=e.target.closest('[data-linked-quote]');if(quote)return openQuoteModal(quote.dataset.linkedQuote);
+    var order=e.target.closest('[data-linked-order]');if(order)return openOrderDetail(order.dataset.linkedOrder);
+    var action=e.target.closest('[data-enquiry-action]')?.dataset.enquiryAction;
+    if(action==='links')return openInquiryLinks(q.i);
+    if(action==='quote')return q.links.quotes.length?openQuoteModal(q.links.quotes.slice().sort((a,b)=>(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0))[0].id):createQuoteFromInquiry(q.raw);
+    if(action==='whatsapp')return openWaForInquiry(q.i);
+    if(action==='edit')return openInqModal(q.i);
+    if(action==='client'){var client=CP.allClients().find(c=>q.cid?c.id===q.cid:CP.matches(c,q.raw));closeDr();switchView('clients');if(client)window.crmClientOpen(client.id);else openClientModal(null,{company:q.c,country:q.k,contactName:q.raw.contactName,contactEmail:q.raw.contactEmail,contactPhone:q.raw.contactPhone});return;}
+    if(!e.target.closest('#eqp-saveNote'))return;
+    var draft=drafts.get(q.i),content=draft.content.trim(),actor=currentUser?.id;if(!content||followBusy.has(q.i))return;followBusy.add(q.i);$('#saveNote').disabled=true;
+    try{var saved=await CP.request('/api/inquiries/'+encodeURIComponent(q.i)+'/followups',{content,nextFollowAt:draft.date});if(currentUser?.id!==actor)return;Object.assign(q.raw,saved);drafts.delete(q.i);render();await loadInquiries().catch(()=>{});ftwToast('跟进已保存');}
+    catch(error){draft.error=error.message;}
+    finally{followBusy.delete(q.i);if(currentUser?.id===actor&&cur?.i===q.i)openDr(CP.inquiryDTO(q.raw),true)}
+  });
+  document.addEventListener('keydown',e=>{
+    if(!dr.classList.contains('open')||document.querySelector('#modal.open'))return;
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeDr()}
+    if(e.key==='Tab'){var f=$$('button:not([disabled]),a[href],textarea,input',dr).filter(x=>x.offsetParent);if(!f.length)return;if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f.at(-1).focus()}else if(!e.shiftKey&&document.activeElement===f.at(-1)){e.preventDefault();f[0].focus()}}
+  },true);
+
+  // drag & drop between columns
+  var dragI=null;
+  document.addEventListener('dragstart',function(e){var c=e.target.closest&&e.target.closest('.ic');if(!c||!root.contains(c))return;dragI=c.dataset.open;c.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(dragI))});
+  document.addEventListener('dragend',function(){dragI=null;$$('.ic.dragging,.col.over').forEach(function(x){x.classList.remove('dragging','over')})});
+  document.addEventListener('dragover',function(e){var col=e.target.closest&&e.target.closest('.col');if(!col||!root.contains(col)||dragI==null||+col.dataset.col>=S.length)return;e.preventDefault();$$('.col.over').forEach(function(x){if(x!==col)x.classList.remove('over')});col.classList.add('over')});
+  document.addEventListener('drop',function(e){var col=e.target.closest&&e.target.closest('.col');if(!col||!root.contains(col)||dragI==null||+col.dataset.col>=S.length)return;e.preventDefault();var i=+col.dataset.col,q=byId(dragI);moveTo(q,i===5?'暂缓':S[i].k)});
+
+  function set(k,v){st[k]=v;st.page=1;render()}
+  $('#stages').addEventListener('click',function(e){var b=e.target.closest('[data-stage]');if(b)set('stage',st.stage===+b.dataset.stage?-1:+b.dataset.stage)});
+  $('#sum').addEventListener('click',function(e){var b=e.target.closest('[data-fl]');if(b)set('fl',st.fl===b.dataset.fl?'':b.dataset.fl)});
+  $('#viewSeg').addEventListener('click',function(e){var b=e.target.closest('button');if(b)setView(b.dataset.v)});
+  var qT;$('#q').addEventListener('input',function(e){clearTimeout(qT);qT=setTimeout(function(){set('q',e.target.value)},160)});
+  $('#qWrap .clr').addEventListener('click',function(){$('#q').value='';set('q','');$('#q').focus()});
+  [['fOwner','owner'],['fSrc','src'],['fFl','fl']].forEach(function(p){$('#'+p[0]).addEventListener('change',function(e){set(p[1],e.target.value)})});
+  function resetAll(){window.inqClientFilter='';window.inqClientIdFilter='';if(typeof inqOwnerFilterQ!=='undefined')inqOwnerFilterQ='';$('#eqp-country').value=$('#eqp-from').value=$('#eqp-to').value='';st.q=st.owner=st.src=st.fl='';st.stage=-1;$('#q').value='';st.page=1;render()}
+  $('#reset').addEventListener('click',resetAll);
+  document.addEventListener('click',function(e){
+    var t=e.target;if(!root.contains(t))return;
+    if(t.closest('[data-reset]'))return resetAll();
+    if(t.closest('[data-more-reset]')){st.src='';st.page=1;render();return}
+    if(t.closest('#eqp-fmoreBtn')){var fm=$('#fmore'),o=fm.classList.toggle('open');if(o){$('#fpanel').classList.add('open');ftwPlace($('#fpanel'),$('#fmoreBtn'))}else $('#fpanel').classList.remove('open');$('#fmoreBtn').setAttribute('aria-expanded',o);return}
+    if(!t.closest('#eqp-fmore')&&!t.closest('#eqp-fpanel')){$('#fmore').classList.remove('open');$('#fpanel').classList.remove('open')}
+    if(t.closest('[data-retry]')){loadInquiries().catch(()=>{});return}
+    var demo=t.closest('[data-crm-action]');if(demo){$('#moreMenu').classList.remove('open');$('#moreBtn').setAttribute('aria-expanded','false');return act(demo.dataset.crmAction,demo)}
+    if(t.closest('#eqp-moreBtn')){var m=$('#moreMenu'),o=m.classList.toggle('open');$('#moreBtn').setAttribute('aria-expanded',o);if(o)$('button',m).focus();return}
+    if(!t.closest('.menu-w'))$('#moreMenu').classList.remove('open');
+    var ex=t.closest('[data-expand]');if(ex){st.expand[ex.dataset.expand]=1;render();return}
+    var ck=t.closest('[data-ck]');if(ck){if(ck.checked)st.sel[ck.dataset.ck]=1;else delete st.sel[ck.dataset.ck];ck.closest('tr').classList.toggle('sel',ck.checked);renderBatch();return}
+    if(t.id==='eqp-ckAll'){$$('[data-ck]').forEach(function(c){if(t.checked)st.sel[c.dataset.ck]=1;else delete st.sel[c.dataset.ck]});render();return}
+    if(t.closest('#eqp-bX')){st.sel={};render();return}
+    var so=t.closest('[data-sort]');if(so){var k=so.dataset.sort,c=st.sort.split(':');set('sort',k+':'+(c[0]===k?(c[1]==='asc'?'desc':'asc'):(k==='a'||k==='d'?'desc':'asc')));return}
+    var pg=t.closest('[data-pg]');if(pg&&!pg.disabled){st.page=+pg.dataset.pg;render();return}
+    if(t.closest('.ck'))return;
+    var op=t.closest('[data-open]');if(op&&!t.closest('.drawer'))openDr(byId(op.dataset.open));
+  });
+  document.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.matches('.ic')){e.preventDefault();openDr(byId(e.target.dataset.open))}
+    if(e.key==='Escape'&&$('#fmore').classList.contains('open')){$('#fmore').classList.remove('open');$('#fpanel').classList.remove('open');$('#fmoreBtn').focus()}
+    if(e.key==='Escape'&&$('#moreMenu').classList.contains('open')){$('#moreMenu').classList.remove('open');$('#moreBtn').focus()}});
+  function setView(mode){
+    auxMode=['draft','exception','stats'].includes(mode)?mode:'';
+    if(!auxMode)st.view=['board','list'].includes(mode)?mode:'board';
+    $('.rail').hidden=!!auxMode;$('#fbar').hidden=!!auxMode;$('#view').hidden=!!auxMode;$('#eqp-aux').hidden=!auxMode;
+    root.querySelectorAll('.subview').forEach(node=>node.classList.toggle('active',node.id==='sub-'+auxMode));
+    root.querySelectorAll('[data-subtab]').forEach(button=>button.classList.toggle('active',button.dataset.subtab===(auxMode||st.view)));
+    closeDr();if(auxMode==='exception')renderExceptions();if(auxMode==='stats')renderInqStats();
+    window.dispatchEvent(new CustomEvent('ftw:inqViewChanged',{detail:mode}));render();
+  }
+  window.crmSetInquiryView=setView;
+  $('#eqp-aux [data-crm-back]').onclick=()=>setView(st.view);
+  ['eqp-country','eqp-from','eqp-to'].forEach(id=>$('#'+id).addEventListener('change',()=>{st.page=1;render()}));
+  function finish(){
+    inqSelected.clear();Object.keys(st.sel).forEach(id=>inqSelected.add(id));renderBatch();
+    var notice=$('#eqp-loadNotice');if(!notice){notice=document.createElement('div');notice.id='eqp-loadNotice';notice.className='crm-notice';$('#view').before(notice)}notice.hidden=!(loadState==='error'&&IQ.length&&!auxMode);notice.innerHTML='更新失败，当前保留上次已加载的询盘。<button type="button" data-retry>重新加载</button>';
+    var filterNotice=$('#eqp-clientScope');if(!filterNotice){filterNotice=document.createElement('div');filterNotice.id='eqp-clientScope';filterNotice.className='crm-client-scope';$('#view').before(filterNotice)}filterNotice.hidden=!(window.inqClientFilter||window.inqClientIdFilter);filterNotice.innerHTML='客户：'+esc(window.inqClientFilter||CP.allClients().find(c=>c.id===window.inqClientIdFilter)?.company||'已筛选')+' <button type="button" data-reset>清除筛选 ×</button>';
+    if(cur&&dr.classList.contains('open')){var q=byId(cur.i);if(q)openDr(q,true);else closeDr()}
+    $('#batch').classList.toggle('show',Object.keys(st.sel).length>0&&st.view==='list'&&!auxMode);
+  }
+  var baseRender=render;render=function(){var board=$('#board'),left=board?.scrollLeft||0;baseRender();finish();board=$('#board');if(board)board.scrollLeft=left;};
+  draw=render;window.crmEnquiryBatch=()=>{st.sel=Object.fromEntries([...inqSelected].map(id=>[id,1]));renderBatch()};
+  window.crmInquiryFilterClient=function(id,name){window.inqClientIdFilter=id;window.inqClientFilter=name;st.q=st.owner=st.src=st.fl='';st.stage=-1;$('#q').value='';setView('board')};
+  window.openInqDetail=function(id){render();var q=byId(id);if(q){if(!root.closest('.view').classList.contains('active'))switchView('enquiry');if(auxMode)setView('board');openDr(q)}};
+  window.closeInqDetail=closeDr;window.inqResetWorkspaceFilters=resetAll;window.inqRefreshDraftBadge=loadBadges;
+  CP.wireShell(root,closeDr);
+  window.addEventListener('ftw:inquiriesChanged',()=>{render();loadBadges()});['ftw:dataReady','ftw:ratesReady','ftw:quotationsChanged'].forEach(name=>window.addEventListener(name,render));
+  document.addEventListener('ftw:session-change',()=>{if(!window.__ftwNoticeUser){drafts.clear();st.sel={};closeDr();dr.replaceChildren();loadState='pending';}render()});
+  render();
+ });
 })();

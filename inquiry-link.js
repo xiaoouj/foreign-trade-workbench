@@ -1,10 +1,11 @@
 // Explicit inquiry -> quotation -> order links. Never infer a project from customer name alone.
+import './public/order-workflow.js';
 const normalizeName=s=>String(s||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
 export function sameCustomer(a,b){
  if(a.clientId&&b.clientId)return String(a.clientId)===String(b.clientId);
  const name=normalizeName(a.clientName);return !!name&&name===normalizeName(b.clientName);
 }
-export const confirmedOrder=o=>['已确认','生产中','已发货','已收款','已完成'].includes(o.status);
+export const confirmedOrder=globalThis.FTWOrderWorkflow.isConfirmed;
 const ranks={'新询盘':0,'已报价':1,'等回复':2,'谈判中':3,'成交':4};
 export function linkedBusiness(inquiry,quotes,orders){
  const linkedQuotes=quotes.filter(q=>q.inquiryId===inquiry.id&&sameCustomer(q,inquiry));

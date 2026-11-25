@@ -27,8 +27,8 @@ test('business permissions: roles, modules, aggregation, attachments and direct 
  const modules=['clients','orders','inquiries','quotations','shipments','emails','comms','exceptions','finance','tasks','contacts','chats','knowledge'];
  await t.test('all 13 owned modules: manager all, sales self, unowned hidden',async()=>{
   for(const mod of modules){
-   own[mod]=await json('POST','/api/'+mod,sales,{company:'same-company',name:'same',title:'Own',content:'Own',status:'草稿'},201);
-   other[mod]=await json('POST','/api/'+mod,outsider,{company:'same-company',name:'same',title:'Private',content:'Private',status:'草稿'},201);
+   own[mod]=await json('POST','/api/'+mod,sales,{company:'same-company',name:'same',title:'Own',content:'Own',status:mod==='orders'?'待确认':'草稿'},201);
+   other[mod]=await json('POST','/api/'+mod,outsider,{company:'same-company',name:'same',title:'Private',content:'Private',status:mod==='orders'?'待确认':'草稿'},201);
    const filename=path.join(data,mod+'.json');const rows=JSON.parse(await fs.readFile(filename,'utf8'));rows.push({id:'legacy-'+mod,title:'Unassigned'});await fs.writeFile(filename,JSON.stringify(rows));
    assert.deepEqual((await json('GET','/api/'+mod,sales)).map(x=>x.id),[own[mod].id],mod);
    assert.equal((await json('GET','/api/'+mod,manager)).length,3,mod);

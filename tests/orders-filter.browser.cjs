@@ -18,16 +18,16 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
     {id:'3',orderNo:'ST250003',clientName:'A',owner:'u1',orderDate:'2025-02-01',amount:300,currency:'CNY',status:'已发货'},
     {id:'4',orderNo:'ST260004',clientName:'A',orderDate:'2026-02-01',amount:400,currency:'CNY',status:'已取消'},
     {id:'5',orderNo:'ST250005',clientName:'B',owner:'u1',orderDate:'',createdAt:new Date(2025,0,4).getTime(),amount:500,currency:'CNY',status:'已完成'},
-    {id:'6',orderNo:'ST260006',clientName:'B',owner:'gone',ownerName:'历史负责人',orderDate:'invalid',createdAt:Date.now(),amount:600,currency:'CNY',status:'已确认'}];
+    {id:'6',orderNo:'ST260006',clientName:'B',owner:'gone',ownerName:'历史负责人',orderDate:'invalid',createdAt:Date.parse('2026-03-01T00:00:00+08:00'),amount:600,currency:'CNY',status:'已确认'}];
    renderOrders();
   });
-  assert.deepEqual(await page.locator('#orderBody .cb-order').evaluateAll(xs=>xs.map(x=>x.dataset.oid)),['4','2','1','3','6','5']);
+  assert.deepEqual(await page.locator('#orderBody .cb-order').evaluateAll(xs=>xs.map(x=>x.dataset.oid)),['6','4','2','1','3','5']);
   const count=async(n)=>assert.equal(await page.locator('#okTotal').textContent(),String(n));
   const money=async(id,n)=>assert.equal((await page.locator('#'+id).textContent()).replace(/[^\d.-]/g,''),String(n));
-  await count(6);await money('okMonthAmount',1700);await money('okAmount',1000);await money('okPaidAmount',700);
+  await count(6);await money('okMonthAmount',1000);await money('okAmount',700);await money('okPaidAmount',700);
   assert.equal(await page.locator('#orderOwnerFilter option').count(),5);
   assert.match(await page.locator('#orderBody').textContent(),/历史负责人/);
-  await page.locator('#orderYearFilter').selectOption('2026');await count(3);await money('okMonthAmount',300);
+  await page.locator('#orderYearFilter').selectOption('2026');await count(4);await money('okMonthAmount',200);
   await page.locator('#orderMonthFilter').selectOption('01');await count(2);await money('okPaidAmount',200);
   await page.locator('#orderOwnerFilter').selectOption('id:u1');await count(1);await money('okAmount',100);
   await page.locator('#orderStatusFilter').selectOption('已完成');await count(0);await money('okMonthAmount',0);

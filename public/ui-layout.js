@@ -1,6 +1,6 @@
 (() => {
  const app=document.querySelector('.app'),side=app?.querySelector('.sidebar'),toggle=document.getElementById('sideToggle');if(!app||!side||!toggle)return;
- const narrow=matchMedia('(max-width:900px)');const key='ftw.sidebar.expanded.v1';let desktopOpen=true;try{desktopOpen=localStorage.getItem(key)!=='false'}catch{}
+ const narrow=matchMedia('(max-width:820px)');const key='ftw.sidebar.expanded.v1';let desktopOpen=true;try{desktopOpen=localStorage.getItem(key)!=='false'}catch{}
  side.id='ftwSidebar';toggle.type='button';toggle.setAttribute('aria-controls',side.id);toggle.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
  const close=document.createElement('button');close.id='ftwNavClose';close.type='button';close.textContent='×';close.setAttribute('aria-label','收起导航菜单');side.querySelector('.brand').appendChild(close);
  const mask=document.createElement('button');mask.id='ftwNavBackdrop';mask.type='button';mask.tabIndex=-1;mask.setAttribute('aria-label','关闭导航菜单');app.after(mask);

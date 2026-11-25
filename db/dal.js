@@ -78,6 +78,8 @@ const ARRAYS = {
   'product-category-settings': { generic: true },
   'inquiry-drafts': { generic: true },
   'inquiry-mcp-tokens': { generic: true },
+  'packing-plans': { generic: true },
+  'chat-bindings': { generic: true },
 };
 
 const KV = ['settings', 'ai-config', 'mail', 'mail-sent', 'notifications', 'system-notices'];
@@ -239,7 +241,7 @@ export async function initDAL() {
     pool = await createPool();
     for (const sql of buildSchemaSQL()) {
       try { await pool.query(sql); }
-      catch(error) { if(/CREATE TABLE IF NOT EXISTS `inquiry_(drafts|mcp_tokens)`/.test(sql))error.inquiryIntakeMigration=true;throw error; }
+      catch(error) { if(/CREATE TABLE IF NOT EXISTS `(inquiry_(drafts|mcp_tokens)|packing_plans)`/.test(sql))error.inquiryIntakeMigration=true;throw error; }
     }
     try {
       const [itemColumns] = await pool.query("SHOW COLUMNS FROM `orders` LIKE 'items'");
@@ -552,11 +554,11 @@ export async function applyClientMerge(changes, removedIds){
 }
 
 // Persist a quotation and its opportunity in the same transaction. Inputs contain complete collections.
-export async function commitQuoteInquiry(collections,connection,removeMissing=false){
+export async function commitQuoteInquiry(collections,connection,removeMissing=false,allowedCollections=['quotations','inquiries']){
  const conn=connection||await pool.getConnection();
  try{await conn.beginTransaction();
   for(const [base,rows] of Object.entries(collections)){
-   if(!(removeMissing?['quotations','inquiries','orders','exceptions','tasks']:['quotations','inquiries']).includes(base)||!Array.isArray(rows))throw Error('Invalid quote/opportunity collection');
+   if(!(removeMissing?['quotations','inquiries','orders','exceptions','tasks']:allowedCollections).includes(base)||!Array.isArray(rows))throw Error('Invalid quote/opportunity collection');
    const desc=ARRAYS[base];if(desc.generic){for(const row of rows)await conn.query('INSERT INTO `'+tableOf(base)+'` (id,data) VALUES (?,?) ON DUPLICATE KEY UPDATE data=VALUES(data)',[row.id,JSON.stringify(row)]);continue;}
    const cols=desc.fields,sql='INSERT INTO `'+tableOf(base)+'` ('+cols.map(k=>'`'+k+'`').join(',')+') VALUES ('+cols.map(()=>'?').join(',')+') ON DUPLICATE KEY UPDATE '+cols.filter(k=>k!=='id').map(k=>'`'+k+'`=VALUES(`'+k+'`)').join(',');
    for(const row of rows)await conn.query(sql,cols.map(k=>toSqlVal(row[k],desc,k)));
@@ -567,3 +569,6 @@ export async function commitQuoteInquiry(collections,connection,removeMissing=fa
 }
 
 export async function commitQuoteVersionMerge(collections,connection){return commitQuoteInquiry(collections,connection,true);}
+
+// Conversion updates the order, quotation and opportunity together, without removing records.
+export async function commitQuoteOrder(collections,connection){return commitQuoteInquiry(collections,connection,false,['orders','quotations','inquiries']);}

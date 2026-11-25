@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme-style="blue">
+<html lang="zh-CN" data-theme-style="flow">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,13 +7,22 @@
   <link rel="stylesheet" href="styles.css?v=20261009prices1" />
   <!-- 下拉检索增强（select → 可输入检索选项框）：combo.js 全局自动扫描，data-no-combo 可排除 -->
   <link rel="stylesheet" href="combo.css?v=20260831a" />
-  <link rel="stylesheet" href="ui-layout.css?v=20260921b" />
+  <link rel="stylesheet" href="ui-layout.css?v=20261116dash2" />
   <link rel="stylesheet" href="calc.css?v=20260923b" />
   <link rel="stylesheet" href="update-notice.css?v=20260921a" />
-  <link rel="stylesheet" href="analytics.css?v=20260928a" />
-  <link rel="stylesheet" href="crm-ui.css?v=20261013focus1" />
+  <link rel="stylesheet" href="analytics.css?v=20261112perf1" />
+  <link rel="stylesheet" href="crm-ui.css?v=20261015stagesvg1" />
   <link rel="stylesheet" href="catalog.css?v=20261010categoryimages1">
   <link rel="stylesheet" href="inquiry-intake.css?v=20261013mcp1">
+  <link rel="stylesheet" href="home.css?v=20261015home1" />
+  <link rel="stylesheet" href="client-workspace.css?v=20261015clients1" />
+  <link rel="stylesheet" href="redesign.css?v=20261116flow1" />
+<link rel="stylesheet" href="/dashboard.css?v=20261116dash2">
+<link rel="stylesheet" href="/analytics-redesign.css?v=20261116dash2">
+<link rel="stylesheet" href="/design-shell.css?v=20261116dash2">
+<link rel="stylesheet" href="/crm-prototypes.css?v=20261117crm1">
+<link rel="stylesheet" href="sales-workspace.css?v=20261117align1">
+  <link rel="stylesheet" href="tasks-board.css?v=20261119tasks1">
 </head>
 <body>
   <!-- Sidebar icons: Lucide 6bc1373b3f3075fbcfea542ea5530fdbd6cb99b2; local SVG symbols, currentColor. License: /licenses/lucide.txt -->
@@ -102,13 +111,25 @@
   <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" /></symbol>
       <symbol id="ico-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-lucide="settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
   <circle cx="12" cy="12" r="3" /></symbol>
+      <symbol id="ico-stage-wait" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock-3"><circle cx="12" cy="12" r="10" />
+  <path d="M12 6v6h4" /></symbol>
+      <symbol id="ico-stage-negotiate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-lucide="handshake"><path d="m11 17 2 2a1 1 0 1 0 3-3" />
+  <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />
+  <path d="m21 3 1 11h-2" />
+  <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />
+  <path d="M3 4h8" /></symbol>
+      <symbol id="ico-stage-won" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-lucide="circle-check"><circle cx="12" cy="12" r="10" />
+  <path d="m16 9-5.5 5.5L8 12" /></symbol>
+      <symbol id="ico-stage-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-lucide="circle-x"><circle cx="12" cy="12" r="10" />
+  <path d="m15 9-6 6" />
+  <path d="m9 9 6 6" /></symbol>
     </defs>
   </svg>
 
   <div class="app">
   <aside class="sidebar">
     <div class="brand">
-      <span class="logo" aria-hidden="true">CA</span>
+      <span class="logo" aria-hidden="true">FT</span>
       <div>
         <div class="brand-title">外贸工作台</div>
         <div class="brand-sub">外贸业务工作台</div>
@@ -188,257 +209,279 @@
       <div class="tb-right">
         <button class="tb-create" id="tbCreate" type="button">+ 新建</button>
         <div class="tb-search">
-          <span class="tb-search-ico">🔍</span>
+          <span class="tb-search-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg></span>
           <input id="globalSearch" placeholder="搜索客户 / 询盘 / 订单…" />
         </div>
-        <button class="tb-icon" id="tbRate" title="刷新汇率">💱</button>
-        <button class="tb-bell" id="tbBell" title="提醒中心"><span class="bell-ico">🔔</span><span id="bellBadge" class="bell-badge hidden">0</span></button>
+        <button class="tb-icon" id="tbRate" title="刷新汇率" aria-label="刷新汇率"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7"/></svg></button>
+        <button class="flow-ai-toggle btn-ghost" id="flowAIToggle" aria-controls="flowAssistant" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></svg><span>AI 助手</span></button>
+        <button class="tb-bell" id="tbBell" title="提醒中心"><span class="bell-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9a6 6 0 0 1 12 0c0 6 3 7 3 7H3s3-1 3-7M10 20h4"/></svg></span><span id="bellBadge" class="bell-badge hidden">0</span></button>
         <div class="tb-avatar" id="tbAvatar" title="账户">A</div>
       </div>
     </header>
     <main>
     <!-- ============ 仪表盘 ============ -->
     <section id="view-dashboard" class="view active">
-      <div class="world-clocks" id="worldClocks"></div>
-      <div class="dashboard-quick" aria-label="快捷操作"><span class="dashboard-quick-label">快捷操作</span><div class="quick-actions">
-              <button class="qa-btn" id="qaQuote"><span class="qa-icon">📋</span><span class="qa-label">新建报价</span></button>
-              <button class="qa-btn" id="qaClient"><span class="qa-icon">👤</span><span class="qa-label">新建客户</span></button>
-              <button class="qa-btn" id="qaPI"><span class="qa-icon">📄</span><span class="qa-label">新建 PI</span></button>
-              <button class="qa-btn" id="qaPL"><span class="qa-icon">📦</span><span class="qa-label">新建装箱单</span></button>
-            </div></div>
       <div class="welcome-row">
-        <div class="welcome">
-          <div class="page-eyebrow">WORKSPACE <span id="dashDate"></span></div><h1 id="dashGreeting">今日工作台</h1>
-          <p id="dashHint">正在加载今日工作摘要…</p>
-        </div>
-        
+        <div class="welcome"><div class="page-eyebrow"><span id="dashDate"></span></div><h1 id="dashGreeting">今日工作台</h1><p id="dashHint">正在加载今日工作摘要…</p></div>
+        <div class="dashboard-quick" aria-label="快捷操作"><span class="dashboard-quick-label">快捷操作</span><div class="quick-actions">
+              <button class="qa-btn" id="qaQuote"><span class="qa-icon"><svg viewBox="0 0 24 24"><path d="M14 3H6v18h12V7zM14 3v4h4M9 12h6M9 16h6"/></svg></span><span class="qa-label">新建报价</span></button>
+              <button class="qa-btn" id="qaClient"><span class="qa-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/></svg></span><span class="qa-label">新建客户</span></button>
+              <button class="qa-btn" id="qaPI"><span class="qa-icon"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h4"/></svg></span><span class="qa-label">新建 PI</span></button>
+              <button class="qa-btn" id="qaPL"><span class="qa-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg></span><span class="qa-label">新建装箱单</span></button>
+            </div></div>
       </div>
 
+      <div class="world-clocks" id="worldClocks"></div>
       <div class="stat-row">
-        <div class="stat-card sc-today" data-go="refresh">
-          <div class="sc-title">待跟进询盘</div>
+        <div class="stat-card sc-today" data-go="enquiry" data-filter="follow" data-metric="warning">
+          <div class="sc-title">待跟进询盘 <span id="followKpiFlag" class="db-kpi-flag" hidden>需处理</span></div>
           <div class="sc-num"><span id="statFollow">0</span><span class="sc-unit">条</span></div>
-          <div class="sc-sub">本地实时数据 · 点击刷新</div>
+          <div class="sc-sub">到期与逾期 · 点击查看</div>
         </div>
-        <div class="stat-card" data-go="quotations" data-filter="month">
+        <div class="stat-card" data-metric="neutral" data-go="quotations" data-filter="month">
           <div class="sc-title">当月报价</div>
           <div class="sc-num"><span id="statQuotes">0</span><span class="sc-unit">份</span></div>
           <div class="sc-sub">报价管理·本月报价单</div>
         </div>
-        <div class="stat-card" data-go="clients">
+        <div class="stat-card" data-metric="neutral" data-go="clients">
           <div class="sc-title">客户数量</div>
           <div class="sc-num"><span id="statClients">0</span><span class="sc-unit">家</span></div>
+          <div class="sc-sub" id="statClientsNote">近 30 天新增 0</div>
         </div>
-        <div class="stat-card" id="cardTasksToday" title="点击查看今日任务">
+        <div class="stat-card" data-metric="warning" id="cardTasksToday" title="点击查看今日任务">
           <div class="sc-title">待办任务</div>
           <div class="sc-num"><span id="statTasksToday">0</span><span class="sc-unit">项</span></div>
+          <div class="sc-sub" id="statTasksNote">暂无到期任务</div>
         </div>
-        <div class="stat-card" data-go="enquiry" title="进行中商机加权管道金额">
+        <div class="stat-card" data-metric="neutral" data-go="enquiry" title="进行中商机加权管道金额">
           <div class="sc-title">加权管道</div>
           <div class="sc-num"><span id="statWeighted">¥0</span></div>
           <div class="sc-sub"><span id="statOpenOpp">0</span> 个进行中商机</div>
         </div>
-        <div class="stat-card" data-go="orders" data-filter="month">
+        <div class="stat-card" data-metric="positive" data-go="orders" data-filter="month">
           <div class="sc-title">本月成交</div>
           <div class="sc-num"><span id="statMonthRevenue">¥0</span></div>
-          <div class="sc-sub">订单+成交询盘（与业绩进度一致）</div>
+          <div class="sc-sub">生产中及后续订单 · 全额计入</div>
         </div>
       </div>
 
       <div class="section-grid">
         <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="panel-title">销售管道</div>
-              <div class="panel-meta">本月询盘按阶段分布</div>
+          <div class="db-card-head">
+            <div><h2>待办与跟进</h2><div class="db-card-sub">询盘跟进与任务合并 · 逾期优先</div></div>
+            <div class="db-card-actions" id="dashboardTodoActions">
+              <button class="btn db-small-button" id="dashNewTask"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>任务</button>
             </div>
-            <button class="btn btn-ghost" data-go="enquiry">查看全部</button>
           </div>
-          <div class="panel-body no-padding">
-            <div id="pipelineList" class="pipeline-list"></div>
-          </div>
+          <div id="todoList" class="todo-list"></div>
         </div>
-
         <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="panel-title">今日待办与跟进</div>
-              <div class="panel-meta">到期询盘与任务 · 逾期优先</div>
-            </div>
-            <button class="btn btn-ghost" id="dashNewTask">+ 新建任务</button>
+          <div class="db-card-head">
+            <div><h2>销售管道</h2><div class="db-card-sub">本月询盘 · 按阶段</div></div>
+            <div class="db-card-actions"><button class="db-link" data-go="enquiry">查看询盘</button></div>
           </div>
-          <div class="panel-body no-padding">
-            <div id="todoList" class="todo-list"></div>
-          </div>
+          <div id="pipelineList"></div>
         </div>
       </div>
-
-      <div class="bottom-grid dashboard-opportunities">
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <div class="panel-title">活跃商机</div>
-              <div class="panel-meta">近 7 天有更新</div>
-            </div>
-            <button class="btn btn-ghost" data-go="enquiry">查看全部</button>
+      <div class="flow-dashboard-bottom">
+        <div class="panel dashboard-revenue">
+          <div class="db-card-head">
+            <div><h2>收入趋势</h2><div class="db-card-sub">近 12 个月成交订单 · 折算 CNY</div></div>
+            <div class="db-card-actions"><button class="db-link" data-go="orders">查看订单</button></div>
           </div>
-          <div class="panel-body no-padding">
-            <div id="oppList" class="opp-list"></div>
-          </div>
-        </div>
-
-
-      </div>
-
-      <div class="panel dashboard-revenue">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">收入趋势</div>
-            <div class="panel-meta">近 12 个月成交订单（折算 CNY）</div>
-          </div>
-          <button class="btn btn-ghost" data-go="orders">查看订单</button>
-        </div>
-        <div class="panel-body">
           <div id="revenueTrend" class="revenue-trend"></div>
+        </div>
+        <div class="flow-deals-column">
+          <div class="panel">
+            <div class="db-card-head">
+              <div><h2>活跃商机</h2><div class="db-card-sub">近 7 天有更新</div></div>
+              <div class="db-card-actions"><button class="db-link" data-go="enquiry">全部</button></div>
+            </div>
+            <div id="oppList"></div>
+          </div>
+          <div class="panel db-fx">
+            <div class="db-card-head">
+              <div><h2>实时汇率</h2><div class="db-card-sub" id="rateTime">正在读取汇率…</div></div>
+              <div class="db-card-actions"><button type="button" id="rateRefreshBtn" class="db-link">↻ 刷新</button></div>
+            </div>
+            <div class="db-fx-grid">
+              <div class="db-fx-pair"><span>USD → CNY</span><b id="rc1">—</b></div>
+              <div class="db-fx-pair"><span>USD → EUR</span><b id="rc2">—</b></div>
+              <div class="db-fx-pair"><span>USD → GBP</span><b id="rc3">—</b></div>
+              <div class="db-fx-pair"><span>USD → AED</span><b id="rc4">—</b></div>
+            </div>
+            <div class="db-fx-notice" id="dashboardRateError" role="status" hidden></div>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- ============ 客户资料 ============ -->
     <section id="view-clients" class="view">
-      <div class="cl-head">
-        <div class="cl-titlebox">
-          <div class="page-eyebrow">CUSTOMERS</div><h2>客户资料</h2>
-          <div class="cl-sub" id="clientMeta">共 0 个客户</div>
-        </div>
-        <div class="cl-toolbar">
-          <button id="clientImport" class="cl-btn" title="文本 / txt / CSV / Excel 批量导入">导入客户</button>
-          <button id="clientColCfg" class="cl-btn" title="显示/隐藏列、自定义表头">列设置</button>
-          <details class="cl-more"><summary class="cl-btn">更多操作 <span aria-hidden="true">⌄</span></summary><div class="cl-more-menu">
-            <button id="clientEditMode" class="cl-btn">编辑模式</button>
-            <button id="clientAiBatch" class="cl-btn">AI 批量建议</button>
-            <button id="clientAiSummary" class="cl-btn">AI 客户摘要</button>
-            <button id="clientQuickTask" class="cl-btn">一键建任务</button>
-            <button id="clientDedup" class="cl-btn">去重检查</button>
-          </div></details>
-          <button id="clientAdd" class="cl-btn cl-btn-primary">＋ 新增客户</button>
-        </div>
-      </div>
-      <div class="client-summary" aria-label="当前可见客户概览">
-        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true"><svg><use href="#ico-clients"/></svg></span><div><span>全部客户</span><strong id="csAll">0</strong></div></div>
-        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true">☆</span><div><span>星标客户</span><strong id="csStar">0</strong></div></div>
-        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true">＋</span><div><span>近 30 天新增</span><strong id="csNew">0</strong></div></div>
-        <div class="client-summary-card"><span class="summary-symbol" aria-hidden="true"><svg><use href="#ico-tasks"/></svg></span><div><span>到期 / 逾期跟进</span><strong id="csDue">0</strong></div></div>
-      </div>
-      <div class="client-scope-tabs" role="group" aria-label="客户范围">
-        <button type="button" class="active" data-client-scope="all" aria-pressed="true">全部客户</button>
-        <button type="button" data-client-scope="mine" aria-pressed="false">我的客户</button>
-        <button type="button" data-client-scope="star" aria-pressed="false">星标客户</button>
-        <button type="button" data-client-scope="due" aria-pressed="false">待跟进客户</button>
-      </div>
-
-      <div class="cl-row2">
-        <div class="cl-search">
-          <input id="clientSearch" placeholder="搜索客户 / 公司 / 国家 / 产品兴趣" />
-          <button id="clientSearchClear" class="cl-clear" title="清空">×</button>
-          <button id="clientSearchBtn" class="cl-btn cl-btn-primary cl-search-btn">搜索</button>
-        </div>
-        <div class="cl-stageline">
-          <button id="clientAiFollow" class="cl-link" title="AI 生成今日跟进优先级计划">✨ AI跟进建议</button>
-          
+<div id="crm-clients" class="crm-prototype">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Customers</div>
+      <h2>客户资料</h2>
+      <p id="clp-headSub">—</p>
+    </div>
+    <div class="r">
+      <button class="btn" id="clientImport" data-crm-action="导入客户">导入</button>
+      <div class="menu-w">
+        <button class="btn" id="clp-moreBtn" aria-haspopup="true" aria-expanded="false" aria-controls="clp-moreMenu"><span class="lbl2">更多操作</span></button>
+        <div class="menu" id="clp-moreMenu" role="menu">
+          <button role="menuitem" id="clientDedup" data-crm-action="客户查重">客户查重 / 合并</button>
+          <button role="menuitem" id="clientColCfg" data-crm-action="列设置">列设置</button>
+          <button role="menuitem" data-crm-action="导出当前筛选">导出当前筛选<small>CSV</small></button>
         </div>
       </div>
+      <button class="btn btn-pri" data-crm-action="新增客户" id="clientAdd"></button>
+    </div>
+  </div>
 
-      <div class="client-filters">
-        <label>负责人<select id="cfOwner"></select></label><label>国家<select id="cfCountry"></select></label><label>来源<select id="cfSource"></select></label>
-        <label>跟进状态<select id="cfFollow"><option value="">全部跟进</option><option value="due">到期 / 逾期</option><option value="stale">长期未跟进</option><option value="missing">未安排跟进</option></select></label>
-        <label>登记日期起<input type="date" id="cfFrom" /></label><label>登记日期止<input type="date" id="cfTo" /></label><button id="cfReset" class="cl-btn">重置筛选</button>
-      </div>
-      <details class="client-advanced"><summary>阶段与分类筛选</summary><div id="clientStageTabs" class="cl-tabs"></div>
-      <div class="cl-row3">
-        <span class="cl-catlabel">🏷 客户分类</span>
-        <div id="clientCatChips" class="cl-chips"></div>
-      </div>
+  <section class="card kpis" id="clp-kpis" aria-label="客户概况（点击可筛选）"></section>
 
-      </details>
+  <div class="fbar" id="clp-fbar">
+    <div class="seg" role="tablist" aria-label="范围" id="clp-scope">
+      <button role="tab" data-v="all" aria-selected="true">全部</button>
+      <button role="tab" data-v="mine" aria-selected="false">我负责的</button>
+      <button role="tab" data-v="star" aria-selected="false">星标</button>
+    </div>
+    <label class="q" id="clp-qWrap"><span class="sr">搜索客户</span><svg class="i"><use href="#crmi-search"/></svg><input id="clientSearch" placeholder="公司、联系人、国家、产品…" autocomplete="off"><button class="clr" type="button" aria-label="清除搜索"><svg class="i"><use href="#crmi-x"/></svg></button></label>
+    <div class="sel"><label class="sr" for="clp-fOwner">负责人</label><select data-no-combo id="clp-fOwner"></select><svg class="i"><use href="#crmi-chev"/></svg></div>
+    <div class="fmore" id="clp-fmore">
+      <button class="btn" id="clp-fmoreBtn" aria-haspopup="true" aria-expanded="false" aria-controls="clp-fpanel">更多筛选</button>
+    </div>
+    <button class="btn btn-ghost reset" id="clp-reset">重置</button>
+    <span class="count" id="clp-count"></span>
+  </div>
 
-      <div id="clientBatchBar" class="cl-batchbar hidden">
-        <span id="clientBatchInfo" class="muted">已选 0 个客户</span>
-        <button id="clientBatchEdit" class="btn-mini" title="先勾选左侧复选框，再点此批量修改">✏️ 批量编辑</button>
-        <button id="clientBatchDelete" class="btn-mini btn-mini--danger" title="先勾选左侧复选框，再点此批量删除">🗑️ 批量删除</button>
-      </div>
-
-      <div class="panel cl-panel">
-        <div class="panel-body no-padding">
-          <div class="table-wrap">
-            <table class="data-table cl-table">
-              <thead>
-                <tr>
-                  <th class="col-checkbox" data-col="check"><input type="checkbox" id="cbClientAll" title="全选/取消全选" /></th>
-                  <th class="cl-th-star" data-col="star">星标</th>
-                  <th class="cl-th-name" data-col="name">客户名称</th>
-                  <th data-col="contact">联系人</th>
-                  <th data-col="owner">跟进人</th>
-                  <th data-col="country">国家</th>
-                  <th data-col="phase">在途询盘</th>
-                  <th data-col="grade">级别</th>
-                  <th data-col="source">来源</th>
-                  <th data-col="phone">联系方式</th>
-                  <th data-col="prod">产品兴趣</th>
-                  <th class="cl-th-comm" data-col="comm">沟通进展</th>
-                  <th data-col="health">健康度</th>
-                  <th data-col="ai">AI</th>
-                  <th data-col="created">创建时间</th>
-                  <th data-col="rel">最后跟进</th>
-                  <th class="col-actions" data-col="ops">操作</th>
-                </tr>
-              </thead>
-              <tbody id="clientBody"></tbody>
-            </table>
-          </div>
+  <section class="card lst">
+    <div class="card-h">
+      <h2 id="clp-lstTitle">客户列表</h2><span class="sub" id="clp-lstSub"></span>
+      <div class="r">
+        <div class="sel"><label class="sr" for="clp-sortSel">排序</label><select data-no-combo id="clp-sortSel">
+          <option value="cr:desc">最新创建</option><option value="nf:asc">下次跟进 · 最早</option><option value="lf:asc">最久未联系</option><option value="av:desc">年度成交额 · 高到低</option><option value="n:asc">名称 A–Z</option>
+        </select><svg class="i"><use href="#crmi-chev"/></svg></div>
+        <div class="seg sm" aria-label="显示方式" id="clp-viewSeg">
+          <button data-v="table" aria-pressed="true" aria-label="表格"></button>
+          <button data-v="card" aria-pressed="false" aria-label="卡片"></button>
         </div>
       </div>
+    </div>
+    <div id="clp-body"></div>
+    <div class="pager" id="clp-pager"></div>
+  </section>
+
+
+<div class="batch" id="clp-batch" role="region" aria-label="批量操作">
+  已选<b id="clp-bN">0</b>个客户<span class="sep"></span>
+  <button class="btn" data-crm-action="批量分配负责人">分配负责人</button>
+  <button class="btn" data-crm-action="批量建跟进任务">建跟进任务</button>
+  <button class="btn" data-crm-action="批量修改级别">改级别</button>
+  <button class="btn dg" data-crm-action="批量删除">删除</button>
+  <span class="sep"></span><button class="btn btn-ghost icon-btn" id="clp-bX" aria-label="取消选择" style="color:#fff;width:32px;height:32px"></button>
+</div>
+
+<div class="dr-bg" id="clp-drBg"></div>
+<aside class="drawer" id="clp-drawer" role="dialog" aria-modal="true" aria-labelledby="clp-drTitle" aria-hidden="true"></aside>
+
+<div class="fpanel" id="clp-fpanel">
+  <div class="frow"><label for="clp-fPh">客户阶段</label><div class="sel"><select data-no-combo id="clp-fPh"></select><svg class="i"><use href="#crmi-chev"/></svg></div></div>
+  <div class="frow"><label for="clp-fLv">级别</label><div class="sel"><select data-no-combo id="clp-fLv"></select><svg class="i"><use href="#crmi-chev"/></svg></div></div>
+  <div class="frow"><label for="clp-fK">国家</label><div class="sel"><select data-no-combo id="clp-fK"></select><svg class="i"><use href="#crmi-chev"/></svg></div></div>
+  <div class="frow"><label for="clp-fSrc">来源</label><div class="sel"><select data-no-combo id="clp-fSrc"></select><svg class="i"><use href="#crmi-chev"/></svg></div></div>
+  <div class="ph"><span id="clp-fmoreInfo">未使用更多筛选</span><button type="button" data-more-reset>清空</button></div>
+</div>
+
+</div>
     </section>
 
     <!-- ============ 询盘分析（管理员） ============ -->
     <section id="view-inqstats" class="view">
-      <div class="panel-head row">
-        <h2>询盘分析看板</h2>
-        <div class="row-right muted">按可见数据统计 · 筛选后全部图表同步</div>
-      </div>
-      <div id="isbFilters" class="orders-filter-bar">
-        <select id="isbOwnerFilter" aria-label="询盘负责人" data-no-combo></select>
-        <select id="isbYearFilter" aria-label="询盘年份" data-no-combo></select>
-        <select id="isbMonthFilter" aria-label="询盘月份" data-no-combo><option value="">全部月份</option><option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option><option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option><option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option><option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option></select>
-        <select id="isbSourceFilter" aria-label="询盘来源" data-no-combo></select>
-        <select id="isbCountryFilter" aria-label="询盘国家" data-no-combo></select>
-        <select id="isbStatusFilter" aria-label="询盘状态" data-no-combo></select>
-        <button class="btn-mini" id="isbReset" type="button">重置筛选</button>
-        <small>按收到询盘日期筛选；日期异常不计入指定年月，可在全部日期下查看。</small>
-      </div>
-      <div class="stats stats-5 isb-kpis">
-        <div class="stat-card"><div class="stat-num" id="isbMonth">0</div><div class="stat-label">筛选询盘</div><div class="stat-hint" id="isbMonthTrend">—</div></div>
-        <div class="stat-card"><div class="stat-num" id="isbPending">0</div><div class="stat-label">进行中</div><div class="stat-hint">待推进商机</div></div>
-        <div class="stat-card"><div class="stat-num" id="isbWon">0</div><div class="stat-label">成交数</div><div class="stat-hint" id="isbRate">成交率 0%</div></div>
-        <div class="stat-card"><div class="stat-num" id="isbFollow">0</div><div class="stat-label">待跟进</div><div class="stat-hint" id="isbOverdue">逾期 0 条</div></div>
-        <div class="stat-card"><div class="stat-num" id="isbTotal">0</div><div class="stat-label">异常记录</div><div class="stat-hint" id="isbLost">流失/搁置 0</div></div>
-      </div>
-      <div class="isb-grid isb-grid-top">
-        <div class="panel isb-panel"><div class="panel-head"><h2>当前阶段分布</h2><span class="muted">数量 / 占比</span></div><div id="isbFunnel" class="isb-funnel"></div></div>
-        <div class="panel isb-panel"><div class="panel-head"><h2>所选范围 · 月度分布</h2><span class="muted">询盘与成交</span></div><div id="isbTrend" class="isb-trend"></div></div>
-      </div>
-      <div class="isb-grid">
-        <div class="panel isb-panel"><div class="panel-head"><h2>来源转化效果</h2><span class="muted">按成交率排序</span></div><div id="isbSourceTable" class="isb-ranking"></div></div>
-        <div class="panel isb-panel"><div class="panel-head"><h2>业务员跟进表现</h2><span class="muted">询盘 / 成交 / 转化率</span></div><div id="isbOwnerTable" class="isb-ranking"></div></div>
-      </div>
-      <div class="isb-grid">
-        <div class="panel isb-panel"><div class="panel-head"><h2>国家 / 市场分布</h2><span class="muted">询盘数量</span></div><div id="isbCountryChart" class="chart-host"></div></div>
-        <div class="panel isb-panel"><div class="panel-head"><h2>当前状态分布</h2><span class="muted">识别卡点</span></div><div id="isbStatusChart" class="chart-host"></div></div>
-      </div>
-    <div class="panel analytics-detail"><div class="panel-head"><h2>询盘明细与跟进提醒</h2><span class="muted">逾期优先 · 点击客户查看</span></div><div id="isbDetails" class="table-wrap"></div></div></section>
+  <div class="head">
+    <div><h2>询盘分析</h2><p>按收到询盘日期统计可见询盘 · 所有图表随筛选同步，点击图中任意一项即可筛选</p></div>
+    <div class="r">
+      <button class="btn" id="isbExport">导出当前筛选</button>
+    </div>
+  </div>
+
+  <div class="fbar" role="group" aria-label="筛选条件" id="isbFilters">
+    <span class="sel"><select data-no-combo id="isbOwnerFilter" aria-label="负责人"></select><svg class="i" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+    <span class="sel"><select data-no-combo id="isbYearFilter" aria-label="年份"></select><svg class="i" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+    <span class="sel"><select data-no-combo id="isbMonthFilter" aria-label="月份"></select><svg class="i" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+    <span class="sel"><select data-no-combo id="isbSourceFilter" aria-label="来源"></select><svg class="i" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+    <span class="sel"><select data-no-combo id="isbCountryFilter" aria-label="国家 / 市场"></select><svg class="i" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+    <span class="sel"><select data-no-combo id="isbStatusFilter" aria-label="状态"></select><svg class="i" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+    <button class="btn btn-ghost reset" id="isbReset">清除筛选</button>
+    <span class="count" aria-live="polite">筛选后 <b id="isbCount">0</b> / <span class="num" id="isbVisibleTotal">0</span> 条</span>
+  </div>
+
+  <section class="card kpis" aria-label="关键指标" id="isbKpis"></section>
+
+  <section class="card flow" aria-labelledby="inqstats-flowh">
+    <div class="flow-l">
+      <h2 id="flowh">询盘流向</h2>
+      <div class="sub">每条询盘此刻停在哪个阶段 · 宽度 = 数量</div>
+      <div class="groups" id="isbGroups"></div>
+      <div class="river" id="flowStageRiver" role="group" aria-label="按阶段筛选"></div>
+      <div class="r-scale"><span>← 推进中</span><span>已关闭 →</span></div>
+      <div class="legend" id="isbStageLegend"></div>
+    </div>
+    <div class="notes" aria-labelledby="inqstats-notesh">
+      <h2 id="inqstats-notesh">本页要点 <span>自动生成</span></h2>
+      <ol id="flowInquiryInsights"></ol>
+    </div>
+  </section>
+
+  <div class="g2">
+    <section class="card" aria-labelledby="inqstats-mh">
+      <div class="card-h"><div><h2 id="inqstats-mh">月度询盘与成交</h2><div class="sub">点击柱子按月份筛选</div></div></div>
+      <div class="mleg"><span><i style="background:#C9D0E3"></i>收到询盘</span><span><i style="background:var(--s-won)"></i>其中已成交</span></div>
+      <div class="mchart" id="isbTrend"></div>
+    </section>
+    <section class="card" aria-labelledby="inqstats-sh">
+      <div class="card-h"><div><h2 id="inqstats-sh">阶段分布</h2><div class="sub">数量 · 占比 · 预计金额（折合 CNY）</div></div></div>
+      <ul class="stl" id="isbFunnel"></ul>
+    </section>
+  </div>
+
+  <div class="g2 eq">
+    <section class="card" aria-labelledby="inqstats-srch">
+      <div class="card-h"><div><h2 id="inqstats-srch">来源转化</h2><div class="sub">询盘量与成交率 · 点击行筛选</div></div>
+        <div class="r"><div class="seg sm" id="isbSourceSort" role="group" aria-label="来源排序"><button aria-pressed="true" data-k="n">按询盘量</button><button aria-pressed="false" data-k="r">按成交率</button></div></div></div>
+      <div class="tbl-wrap"><table class="tbl" id="isbSourceTable"></table></div>
+    </section>
+    <section class="card" aria-labelledby="inqstats-ownh">
+      <div class="card-h"><div><h2 id="inqstats-ownh">业务员跟进</h2><div class="sub">负责询盘 · 推进中 · 成交 · 逾期</div></div></div>
+      <div class="tbl-wrap"><table class="tbl" id="isbOwnerTable"></table></div>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="inqstats-cth" style="margin-bottom:16px">
+    <div class="card-h"><div><h2 id="inqstats-cth">国家 / 市场</h2><div class="sub">按询盘数量 · 点击筛选</div></div><div class="r"><button class="link" id="isbCountriesMore">显示全部</button></div></div>
+    <div class="merge-note" id="isbMergeNote"></div>
+    <ul class="ctry" id="isbCountryChart"></ul>
+  </section>
+
+  <section class="card" aria-labelledby="inqstats-dh">
+    <div class="card-h"><div><h2 id="inqstats-dh">询盘明细与跟进提醒</h2><div class="sub">有提醒的排在前面 · 点表头排序</div></div>
+      <div class="r"><input class="dsearch" id="isbDetailSearch" type="search" placeholder="搜索客户或产品" aria-label="搜索客户或产品"></div></div>
+    <div class="tbl-wrap" id="isbDetails"><table class="tbl" id="isbDetailTable"></table></div>
+    <div class="pager" id="isbPager"></div>
+  </section>
+</section>
 
     <!-- ============ 报价管理 ============ -->
     <section id="view-quotations" class="view">
+<div class="crm-prototype sales-prototype" id="live-sales-quotes">
+
+<div class="head"><div><div class="eyebrow">Quotations</div><h2>报价管理</h2><p id="qsw-headSub"></p></div><div class="r"><button class="btn" id="qsw-exportBtn"></button><div class="menu-w"><button class="btn" id="qsw-moreBtn" aria-expanded="false" aria-controls="qsw-moreMenu"></button><div class="menu" id="qsw-moreMenu" role="menu"><button role="menuitem" data-action="columns">列设置</button><button role="menuitem" data-action="export">导出当前筛选 <small>CSV</small></button><button role="menuitem" data-action="ai">AI 识别报价单</button></div></div><button class="btn btn-pri" id="qsw-addBtn"></button></div></div>
+<section class="card kpis sales-kpis" id="qsw-kpis" aria-label="概况，点击可筛选"></section><section class="funnel" id="qsw-funnel" aria-label="按业务阶段筛选"></section><div class="attention-row" id="qsw-attention"></div>
+<div class="fbar" id="qsw-fbar"><label class="q" id="qsw-qWrap"><span class="sr">搜索</span><svg class="i"><use href="#crmi-search"/></svg><input id="qsw-q" placeholder="单号、客户、项目…" autocomplete="off"><button class="clr" aria-label="清除搜索"><svg class="i"><use href="#crmi-x"/></svg></button></label><div class="sel"><label class="sr" for="qsw-fOwner">负责人</label><select data-no-combo id="qsw-fOwner"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="sel"><label class="sr" for="qsw-fCur">币种</label><select data-no-combo id="qsw-fCur"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="fmore" id="qsw-fmore"><button class="btn" id="qsw-fmoreBtn" aria-expanded="false" aria-controls="qsw-fpanel">更多筛选</button></div><button class="btn btn-ghost reset" id="qsw-reset">重置</button><span class="count" id="qsw-count"></span></div>
+<section class="card lst slst"><div class="card-h"><h2 id="qsw-lstTitle">报价管理列表</h2><span class="sub" id="qsw-lstSub"></span><div class="r"><div class="sel"><label class="sr" for="qsw-sortSel">排序</label><select data-no-combo id="qsw-sortSel"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="seg sm" id="qsw-viewSeg" aria-label="显示方式"><button data-view="table" aria-pressed="true" aria-label="表格"></button><button data-view="card" aria-pressed="false" aria-label="卡片"></button></div></div></div><div id="qsw-body"></div><div class="pager" id="qsw-pager"></div></section>
+<p class="footnote" id="qsw-footnote"></p><div class="dr-bg" id="qsw-drBg"></div><aside class="drawer" id="qsw-drawer" role="dialog" aria-modal="true" aria-labelledby="drTitle" aria-hidden="true" inert></aside><div class="fpanel" id="qsw-fpanel"></div><div class="batch" id="qsw-batch" aria-label="批量操作"></div></div>
+<div class="sales-legacy" hidden inert>
       <div class="sales-page-heading"><div><div class="page-eyebrow">QUOTATIONS</div><h2>报价管理</h2><p>管理报价、跟进客户反馈，保留每一轮修改</p></div><div class="sales-actions"><button id="qtAiAdd" class="btn-ghost">AI 识别报价单</button><button id="qtAdd" class="btn-primary">＋ 新增报价</button></div></div>
       <div class="sales-kpis">
         <div><span class="sales-kpi-icon">▤</span><section><span>本月报价</span><strong id="qkMonth">0</strong></section></div>
@@ -449,16 +492,25 @@
       <section class="sales-card sales-quote-list">
         <div class="sales-tabs" id="qtStatusTabs" role="group" aria-label="报价状态"></div>
         <div class="sales-filters"><input id="qtSearch" placeholder="搜索报价单号 / 客户 / 项目" aria-label="搜索报价" /><select id="qtStatusFilter" data-no-combo aria-label="报价状态"><option value="">全部状态</option><option>草稿</option><option>已发送</option><option>客户确认</option><option>客户拒绝</option><option>已过期</option><option>已转订单</option></select><select id="qtCurrencyFilter" data-no-combo aria-label="币种"><option value="">全部币种</option></select><label>报价日期<input id="qtDateFrom" type="date" aria-label="报价起始日期" /></label><label>至<input id="qtDateTo" type="date" aria-label="报价结束日期" /></label><button class="btn-ghost" id="qtReset">重置</button></div>
-        <div class="table-wrap"><table class="data-table sales-quote-table"><thead><tr><th data-col="quoteNo">报价单号</th><th data-col="clientName">客户</th><th data-col="amount">报价金额</th><th data-col="tradeTerms">贸易条款</th><th data-col="createdAt">报价日期</th><th data-col="status">状态</th><th data-col="revision">修改轮次</th><th data-col="owner">负责人</th><th data-col="projectName">项目</th><th data-col="ops">操作</th></tr></thead><tbody id="qtBody"></tbody></table></div>
+        <div class="table-wrap"><table class="data-table sales-quote-table"><thead><tr><th data-col="quoteNo">报价单号</th><th data-col="clientName">客户</th><th data-col="amount">报价金额</th><th data-col="tradeTerms">贸易条款</th><th data-col="createdAt">报价日期</th><th data-col="status">状态</th><th data-col="revision">修改轮次</th><th data-col="owner">负责人</th><th data-col="projectName">项目</th><th data-col="ops">操作</th></tr></thead><tbody id="legacyQtBody"></tbody></table></div>
         <div class="table-footer"><span class="muted" id="qtMeta"></span><label class="qt-page-size">每页 <select id="qtPageSize" data-no-combo aria-label="每页报价条数"><option value="10">10 条</option><option value="20">20 条</option><option value="50">50 条</option></select></label><span class="muted" id="qtFootMeta"></span><div class="pagination" id="qtPagination"></div></div>
       </section>
       <section id="qtSelectedDetail" aria-live="polite"></section>
-    </section>
+    </div>
+</section>
 
     <section id="view-order-detail" class="view"></section>
 
     <!-- ============ 订单数据 ============ -->
     <section id="view-orders" class="view">
+<div class="crm-prototype sales-prototype" id="live-sales-orders">
+
+<div class="head"><div><div class="eyebrow">Orders</div><h2>订单数据</h2><p id="osw-headSub"></p></div><div class="r"><button class="btn" id="osw-exportBtn"></button><div class="menu-w"><button class="btn" id="osw-moreBtn" aria-expanded="false" aria-controls="osw-moreMenu"></button><div class="menu" id="osw-moreMenu" role="menu"><button role="menuitem" data-action="batch-edit">批量编辑</button><button role="menuitem" data-action="batch-delete">批量删除</button><button role="menuitem" data-action="columns">列设置</button><button role="menuitem" data-action="export">导出当前筛选 <small>CSV</small></button><button role="menuitem" data-action="ai">AI 识别订单</button></div></div><button class="btn btn-pri" id="osw-addBtn"></button></div></div>
+<section class="card kpis sales-kpis" id="osw-kpis" aria-label="概况，点击可筛选"></section><section class="funnel" id="osw-funnel" aria-label="按业务阶段筛选"></section><div class="attention-row" id="osw-attention"></div>
+<div class="fbar" id="osw-fbar"><label class="q" id="osw-qWrap"><span class="sr">搜索</span><svg class="i"><use href="#crmi-search"/></svg><input id="osw-q" placeholder="单号、客户、项目…" autocomplete="off"><button class="clr" aria-label="清除搜索"><svg class="i"><use href="#crmi-x"/></svg></button></label><div class="sel"><label class="sr" for="osw-fOwner">负责人</label><select data-no-combo id="osw-fOwner"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="sel"><label class="sr" for="osw-fCur">币种</label><select data-no-combo id="osw-fCur"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="fmore" id="osw-fmore"><button class="btn" id="osw-fmoreBtn" aria-expanded="false" aria-controls="osw-fpanel">更多筛选</button></div><button class="btn btn-ghost reset" id="osw-reset">重置</button><span class="count" id="osw-count"></span></div>
+<section class="card lst slst"><div class="card-h"><h2 id="osw-lstTitle">订单数据列表</h2><span class="sub" id="osw-lstSub"></span><div class="r"><div class="sel"><label class="sr" for="osw-sortSel">排序</label><select data-no-combo id="osw-sortSel"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="seg sm" id="osw-viewSeg" aria-label="显示方式"><button data-view="table" aria-pressed="true" aria-label="表格"></button><button data-view="card" aria-pressed="false" aria-label="卡片"></button></div></div></div><div id="osw-body"></div><div class="pager" id="osw-pager"></div></section>
+<p class="footnote" id="osw-footnote"></p><div class="dr-bg" id="osw-drBg"></div><aside class="drawer" id="osw-drawer" role="dialog" aria-modal="true" aria-labelledby="drTitle" aria-hidden="true" inert></aside><div class="fpanel" id="osw-fpanel"></div><div class="batch" id="osw-batch" aria-label="批量操作"></div></div>
+<div class="sales-legacy" hidden inert>
       <div class="panel-head row">
         <h2>订单数据</h2>
         <div class="row-right">
@@ -476,10 +528,13 @@
           <select aria-label="订单状态" id="orderStatusFilter" class="mini-select" data-no-combo>
             <option value="">全部状态</option>
             <option value="待确认">待确认</option>
-            <option value="已确认">已确认</option>
+            <option value="待收预付款">待收预付款</option>
+            <option value="已确认">已确认（历史）</option>
             <option value="生产中">生产中</option>
+            <option value="待收尾款">待收尾款</option>
+            <option value="待发货">待发货</option>
             <option value="已发货">已发货</option>
-            <option value="已收款">已收款</option>
+            <option value="已收款">已收款（历史）</option>
             <option value="已完成">已完成</option>
             <option value="已取消">已取消</option>
           </select>
@@ -495,22 +550,27 @@
           <div class="sc-num"><span id="okTotal">0</span><span class="sc-unit">笔</span></div>
         </div>
         <div class="stat-card">
-          <div class="sc-title">待确认</div>
+          <div class="sc-title">待收预付款</div>
           <div class="sc-num"><span id="okPending">0</span><span class="sc-unit">笔</span></div>
         </div>
         <div class="stat-card">
-          <div class="sc-title">已发货</div>
-          <div class="sc-num"><span id="okShipped">0</span><span class="sc-unit">笔</span></div>
+          <div class="sc-title">生产中</div>
+          <div class="sc-num"><span id="okProducing">0</span><span class="sc-unit">笔</span></div>
         </div>
         <div class="stat-card">
-          <div class="sc-title">待收款</div>
+          <div class="sc-title">待收余额</div>
           <div class="sc-num"><span id="okAmount">¥0</span></div>
         </div>
-        <div class="stat-card" title="当前筛选结果中，已收款及已完成订单金额，折合 CNY"><div class="sc-title">已收款</div><div class="sc-num"><span id="okPaidAmount">¥0</span></div></div>
-        <div class="stat-card" title="当前筛选结果中，未取消订单的总金额，折合 CNY"><div class="sc-title">筛选订单金额</div><div class="sc-num"><span id="okMonthAmount">¥0</span></div></div>
+        <div class="stat-card" title="当前筛选结果的实际已收款，按登记比例计算；未登记的生产及交付订单不推算收款"><div class="sc-title">已收款</div><div class="sc-num"><span id="okPaidAmount">¥0</span></div></div>
+        <div class="stat-card" title="生产中、待收尾款、待发货、已发货和已完成订单全额，含历史已收款，取消订单不计入"><div class="sc-title">成交金额</div><div class="sc-num"><span id="okMonthAmount">¥0</span></div></div>
 
       </div>
 
+      <div class="muted" style="margin:0 0 16px;font-size:12px;line-height:1.7">
+        <div>流程：待确认 → 待收预付款 → 生产中 → 待收尾款 → 待发货 → 已发货 → 已完成；已取消订单保留记录。</div>
+        <div>成交金额从生产中起按订单全额计入；未取消合同金额 <strong id="okContractAmount">¥0</strong>（含待确认、待收预付款）。</div>
+        <div id="orderPaymentNote" role="status"></div>
+      </div>
       <div class="panel">
         <div class="panel-header">
           <div>
@@ -542,12 +602,13 @@
                   <th data-col="c9" style="width:100px;" class="text-center">操作</th>
                 </tr>
               </thead>
-              <tbody id="orderBody"></tbody>
+              <tbody id="legacyOrderBody"></tbody>
             </table>
           </div>
         </div>
       </div>
-    </section>
+    </div>
+</section>
 
     <!-- ============ 客户 360° 详情 ============ -->
     <section id="view-client-detail" class="view">
@@ -564,47 +625,61 @@
 
     <!-- ============ 询盘管理 ============ -->
     <section id="view-enquiry" class="view">
-      <header class="inq-page-head">
-        <div><h2>询盘与商机</h2><p>客户需求、报价进展与跟进记录集中管理</p></div>
-        <div class="inq-head-tools"><div class="inq-main-actions"><button id="inqAdd" class="btn-primary" type="button">＋ 新增询盘</button><button id="aiRegisterBtn" class="btn-ghost" type="button" title="粘贴邮件或聊天记录，AI 自动提取">✧ AI 智能登记</button></div>
-      <div class="inq-integrations" aria-label="询盘接入与设置"><span>接入与工具</span><button id="aiSettingsBtn2" class="btn-ghost" type="button">⚙ AI 设置</button><button id="inqMcpSetup" class="btn-ghost" type="button">MCP 接入</button><button id="inqSync" class="btn-ghost" type="button" onclick="reconcileInquiryLinks(this)">↻ 同步关联状态</button><button id="inqImport" class="btn-ghost" type="button">↓ 导入记录</button></div></div>
-      </header>
-      <div class="inq-layout" id="inqLayout">
-      <div class="inq-main-column">
-      <div id="inqStageSummary" class="inq-stage-summary" role="group" aria-label="按商机阶段筛选"></div>
-      <section class="inq-workspace" aria-label="询盘工作区">
-      <div class="inq-workspace-tabs subtabs" role="group" aria-label="询盘视图">
-        <div><button class="subtab active" data-subtab="board" type="button">看板</button><button class="subtab" data-subtab="list" type="button">清单</button><button class="subtab" data-subtab="stats" type="button">统计分析</button></div>
-        <div class="inq-secondary-tabs"><button class="subtab" data-subtab="exception" type="button">异常登记 <span id="inqExceptionCount">0</span></button><button class="subtab" data-subtab="draft" type="button">草稿箱 <span id="inqDraftCount">0</span></button></div>
+<div id="crm-enquiry" class="crm-prototype">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Enquiries &amp; deals</div>
+      <h2>询盘与商机</h2>
+      <p id="eqp-headSub">—</p>
+    </div>
+    <div class="r">
+      <div class="menu-w">
+        <button class="btn" id="eqp-moreBtn" aria-haspopup="true" aria-expanded="false" aria-controls="eqp-moreMenu"><span class="lbl2">更多</span></button>
+        <div class="menu" id="eqp-moreMenu" role="menu">
+          <button role="menuitem" id="inqImport" data-crm-action="导入记录">导入记录</button>
+          <button role="menuitem" id="inqSync" data-crm-action="同步关联状态">同步报价 / 订单关联状态</button>
+          <hr>
+          <button role="menuitem" id="aiSettingsBtn2" data-crm-action="AI 设置">AI 设置</button>
+          <button role="menuitem" id="inqMcpSetup" data-crm-action="MCP 接入">MCP 接入</button>
+        </div>
       </div>
-      <div class="inq-filter-controls" id="inqFilterControls">
-        <div class="inq-filter-row"><input id="inqSearch" type="search" placeholder="搜索客户 / 产品 / 国家" aria-label="搜索询盘" /><label>负责人<select id="inqOwnerFilter" data-no-combo><option value="">全部</option></select></label><label>来源<select id="inqSourceFilter" data-no-combo><option value="">全部</option></select></label><label>跟进<select id="inqFollowScope" data-no-combo><option value="">全部</option><option value="due">到期 / 逾期</option><option value="today">今天</option><option value="missing">未安排</option></select></label><button class="btn-ghost" id="inqMoreFilters" type="button" aria-expanded="false" aria-controls="inqAdvancedFilters">更多筛选</button></div>
-        <div id="inqAdvancedFilters" class="inq-advanced-filters" hidden><label>国家<select id="inqCountryFilter" data-no-combo><option value="">全部国家</option></select></label><label>收到日期起<input id="inqReceivedFrom" type="date" /></label><label>至<input id="inqReceivedTo" type="date" /></label><button id="inqResetFilters" class="btn-ghost" type="button">重置筛选</button></div>
-        <div id="inqActiveFilters" class="inq-active-filters" hidden></div>
-        <div class="inq-batch-toolbar"><div><span id="inqSelectionMeta">选择后可批量操作</span><button id="inqBatchEdit" class="inq-text-action" type="button" disabled>批量编辑</button><button id="inqBatchDelete" class="inq-text-action danger" type="button" disabled>批量删除</button><button id="inqClearSelection" class="inq-text-action" type="button" hidden>取消选择</button></div><span id="inqResultMeta">共 0 条</span></div>
-      </div>
+      <button class="btn subtab" data-crm-action="异常登记" id="eqp-anomBtn" data-subtab="exception">异常登记 <span class="n" id="inqExceptionCount">0</span></button>
+      <button class="btn subtab" data-crm-action="草稿箱" id="eqp-draftBtn" data-subtab="draft">草稿箱 <span class="n g" id="inqDraftCount">0</span></button>
+      <button class="btn" data-crm-action="AI 智能登记" id="aiRegisterBtn">AI 智能登记</button>
+      <button class="btn btn-pri" data-crm-action="新增询盘" id="inqAdd">新增询盘</button>
+    </div>
+  </div>
 
-      <!-- 看板 -->
-      <div id="sub-draft" class="subview">
+  <section class="card rail" aria-label="销售阶段">
+    <div class="stages" id="inqStageSummary"></div>
+    <div class="sum" id="eqp-sum"></div>
+  </section>
+
+  <div class="fbar" id="eqp-fbar">
+    <div class="seg tabs" role="tablist" aria-label="视图" id="eqp-viewSeg">
+      <button role="tab" data-v="board" data-subtab="board" class="subtab active" aria-selected="true">看板</button>
+      <button role="tab" data-v="list" data-subtab="list" class="subtab" aria-selected="false">清单</button>
+    </div>
+    <label class="q" id="eqp-qWrap"><span class="sr">搜索询盘</span><svg class="i"><use href="#crmi-search"/></svg><input id="inqSearch" placeholder="客户、产品、国家…" autocomplete="off"><button class="clr" type="button" aria-label="清除搜索"><svg class="i"><use href="#crmi-x"/></svg></button></label>
+    <div class="sel"><label class="sr" for="eqp-fOwner">负责人</label><select data-no-combo id="eqp-fOwner"></select><svg class="i"><use href="#crmi-chev"/></svg></div>
+    <div class="sel"><label class="sr" for="eqp-fFl">跟进</label><select data-no-combo id="eqp-fFl">
+      <option value="">全部跟进状态</option><option value="due">跟进到期 / 逾期</option><option value="none">未安排跟进</option><option value="old">超 30 天未推进</option><option value="nolink">未关联报价</option>
+    </select><svg class="i"><use href="#crmi-chev"/></svg></div>
+    <div class="fmore" id="eqp-fmore">
+      <button class="btn" id="eqp-fmoreBtn" aria-haspopup="true" aria-expanded="false" aria-controls="eqp-fpanel">更多筛选</button>
+    </div>
+    <button class="btn btn-ghost reset" id="eqp-reset">重置</button>
+    <span class="count" id="eqp-count"></span>
+  </div>
+
+  <div id="eqp-view"></div><section id="eqp-aux" class="card" hidden><div class="crm-aux-head"><button type="button" class="btn" data-crm-back>← 返回商机</button></div><div id="sub-draft" class="subview">
         <div class="inq-drafts-card">
           <div class="inq-draft-toolbar"><select id="inqDraftStatus" data-no-combo aria-label="草稿状态"><option value="pending">待确认</option><option value="confirmed">已登记</option><option value="linked">已关联</option><option value="dismissed">非询盘</option><option value="all">全部草稿</option></select><button class="btn-ghost" id="inqDraftRefresh" type="button">刷新</button><span class="muted">原文先保存，核对后再登记为询盘</span></div>
           <div id="inqDraftList"></div>
           <div class="inq-draft-pagination"><span id="inqDraftPage" class="muted"></span><button class="btn-mini" id="inqDraftPrev" type="button">上一页</button><button class="btn-mini" id="inqDraftNext" type="button">下一页</button></div>
         </div>
-      </div>
-      <div id="sub-board" class="subview active">
-        <div id="inqBoard" class="kanban"></div>
-      </div>
+      </div><div id="sub-stats" class="subview"><div class="inq-analytics-intro"><p class="inq-analytics-scope">统计基于全部可见询盘；清单筛选不影响统计结果。</p><a href="#/inqstats" class="inq-text-action">完整询盘分析 →</a></div>
 
-      <!-- 清单 -->
-      <div id="sub-list" class="subview">
-        <div class="table-wrap inq-list-scroll"><table class="inq-opportunity-table" aria-label="询盘商机清单"><thead><tr><th class="inq-check-col"><input type="checkbox" id="cbInqAll" aria-label="选择本页询盘" /></th><th>客户 / 需求</th><th>阶段</th><th>关联业务</th><th class="inq-follow-col">最近跟进</th><th>操作</th></tr></thead><tbody id="inqListBody"></tbody></table></div>
-        <div class="inq-list-footer"><label>每页 <select id="inqPageSize" data-no-combo aria-label="每页询盘条数"><option value="10">10 条</option><option value="20" selected>20 条</option><option value="50">50 条</option></select></label><span id="inqPageMeta"></span><div id="inqPagination" class="pagination"></div></div>
-      </div>
-
-      <!-- 统计分析 -->
-      <div id="sub-stats" class="subview"><p class="inq-analytics-scope">统计基于全部可见询盘；清单筛选不影响统计结果。</p>
-        
       <div class="stats stats-4">
           <div class="stat-card"><div class="stat-num" id="istInq">0</div><div class="stat-label">询盘总数</div></div>
           <div class="stat-card"><div class="stat-num" id="istConv">0%</div><div class="stat-label">成交率</div></div>
@@ -625,10 +700,7 @@
           <div class="panel-head"><h2>按国家分布</h2></div>
           <div id="istCountryChart" class="chart-host"></div>
         </div>
-      </div>
-
-      <!-- 异常登记 -->
-      <div id="sub-exception" class="subview">
+      </div><div id="sub-exception" class="subview">
         <div class="panel-head row">
           <h2 style="font-size:15px">询盘异常问题</h2>
           <div class="row-right">
@@ -646,62 +718,85 @@
             <tbody id="excBody"></tbody>
           </table>
         </div>
-      </div>
-      </section>
-      </div>
-      <button id="inqDetailBackdrop" class="inq-detail-backdrop" type="button" aria-label="关闭询盘详情" hidden></button>
-      <aside id="inqDetailPanel" class="inq-detail-panel" aria-label="询盘详情" hidden></aside>
-      </div>
+      </div></section>
+
+
+<div class="batch" id="eqp-batch" role="region" aria-label="批量操作">
+  已选<b id="eqp-bN">0</b>条询盘<span class="sep"></span>
+  <button class="btn" data-crm-action="批量改阶段">改阶段</button>
+  <button class="btn" data-crm-action="批量分配负责人">分配负责人</button>
+  <button class="btn dg" data-crm-action="批量删除">删除</button>
+  <span class="sep"></span><button class="btn btn-ghost icon-btn" id="eqp-bX" aria-label="取消选择" style="color:#fff;width:32px;height:32px"></button>
+</div>
+
+<div class="dr-bg" id="eqp-drBg"></div>
+<aside class="drawer" id="eqp-drawer" role="dialog" aria-modal="true" aria-labelledby="eqp-drTitle" aria-hidden="true"></aside>
+
+<div class="fpanel" id="eqp-fpanel">
+  <div class="frow"><label for="eqp-fSrc">来源</label><div class="sel"><select data-no-combo id="eqp-fSrc"></select><svg class="i"><use href="#crmi-chev"/></svg></div></div>
+  <details class="crm-extra-filters"><summary>国家与收到日期</summary><label>国家<select id="eqp-country" data-no-combo></select></label><label>收到日期起<input id="eqp-from" type="date"></label><label>至<input id="eqp-to" type="date"></label></details><div class="ph"><span id="eqp-fmoreInfo">未使用更多筛选</span><button type="button" data-more-reset>清空</button></div>
+</div>
+
+</div>
     </section>
 
     <!-- ============ 业绩进度 ============ -->
     <section id="view-performance" class="view">
-      <div class="panel-head row">
-        <h2>业绩进度</h2>
-        <div class="row-right">
-          <div class="seg">
-            <button class="seg-btn active" data-period="month">月度</button>
-            <button class="seg-btn" data-period="quarter">季度</button>
-            <button class="seg-btn" data-period="year">年度</button>
-          </div>
-          <button id="perfEditTarget" class="btn-mini">⚙ 设置目标</button>
-        </div>
-      </div>
+  <div class="head">
+    <div><h2>业绩进度</h2><p id="performance-hsub">按下单日期统计生产中及后续订单 · 折合 CNY · 成交询盘不重复计入</p></div>
+    <div class="ctrl">
+      <div class="seg" id="perfPeriods" role="group" aria-label="统计周期"><button aria-pressed="true" data-period="month">月度</button><button aria-pressed="false" data-period="quarter">季度</button><button aria-pressed="false" data-period="year">年度</button></div>
+      <label>基准月份 <input class="in in-num" type="month" id="perfDate" value="2026-11"></label>
+      <label>目标视角 <select data-no-combo class="in" id="perfOwner"><option value="">公司总目标</option></select></label>
+      <label>大单门槛 <input class="in in-num thr" type="number" id="perfLarge" min="0" step="10000" value="100000" aria-describedby="performance-thrU"><span id="performance-thrU">CNY</span></label>
+      <button class="btn" id="perfEditTarget"><svg class="i"><use href="#i-gear"/></svg>设置全年目标</button>
+    </div>
+  </div>
 
-      <div class="orders-filter-bar"><label>基准月份 <input id="perfDate" type="month" /></label><label>目标视角 <select id="perfOwner" data-no-combo></select></label><label>大单门槛（CNY） <input id="perfLarge" type="number" min="1" value="100000" /></label></div>
-      <p id="perfBudget" class="muted" style="line-height:1.8"></p>
-      <div class="stats stats-4">
-        <div class="stat-card"><div class="stat-num" id="pfTarget">¥0</div><div class="stat-label">目标金额</div></div>
-        <div class="stat-card"><div class="stat-num" id="pfActual">¥0</div><div class="stat-label">订单金额</div></div>
-        <div class="stat-card"><div class="stat-num" id="pfRate">0%</div><div class="stat-label">完成率</div></div>
-        <div class="stat-card"><div class="stat-num" id="pfDelta">¥0</div><div class="stat-label">距目标差额</div></div>
-      </div>
-      <div id="pfBreakdown" class="muted" style="margin:-8px 2px 14px;font-size:12px"></div>
+  <section class="card ruler" aria-labelledby="performance-rh">
+    <h2 class="sr" id="performance-rh">目标进度</h2>
+    <div class="ruler-top stats-4" id="pfMetrics"></div>
+    <div class="track" id="pfRing" role="img"><div class="fill" id="pfFill"></div><div class="time" id="pfTime"><span></span></div></div>
+    <div class="ticks"><span>0</span><span>25%</span><span>50%</span><span>75%</span><span id="pfTargetTick">目标</span></div>
+    <div class="ruler-foot" id="pfRulerFoot"></div>
+  </section>
 
-      <div class="perf-chart-grid">
-        <div class="panel">
-          <div class="panel-head"><h2>目标完成进度</h2></div>
-          <div id="pfRing" class="ring-host"></div>
-          <div id="pfRingLabel" class="ring-label"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h2>所选年度 · 每月实绩 / 目标</h2></div>
-          <div id="pfMonthlyChart" class="chart-host"></div>
-        </div>
-      </div>
+  <div class="g2 wide">
+    <section class="card" aria-labelledby="performance-mh">
+      <div class="card-h"><div><h2 id="performance-mh">2026 年每月实绩</h2><div class="sub">对照月度目标 · 点击柱子看当月订单</div></div>
+        <div class="r"><div class="seg sm" id="pfChartModes" role="group" aria-label="图表视图"><button aria-pressed="true" data-perf-mode="chart">单月</button><button aria-pressed="false" data-perf-mode="cumulative">累计</button><button aria-pressed="false" data-perf-mode="table">数据表</button></div></div></div>
+      <div class="mleg" id="performance-mleg"></div>
+      <div class="mc" id="pfMonthlyChart"></div><div class="mc" id="pfCumulative" hidden></div>
+    </section>
+    <section class="card" id="pfTeam" hidden aria-labelledby="performance-oh">
+      <div class="card-h"><div><h2 id="performance-oh">业务员业绩</h2><div class="sub" id="pfTeamMonth">本周期 · CNY</div></div></div>
+      <div class="tbl-wrap"><div id="pfTeamBody"></div></div>
+    </section>
+  </div>
 
-      <div class="perf-chart-grid perf-trend-row"><div class="panel"><div class="panel-head"><h2>所选年度 · 累计实绩趋势</h2></div><div id="pfCumulative" class="chart-host"></div></div><div class="panel"><div class="panel-head"><h2>周期内订单 · 状态分布</h2></div><div id="pfStatus" class="chart-host"></div></div></div>
-      <div class="perf-chart-grid perf-distribution-row">
-        <div class="panel">
-          <div class="panel-head"><h2>客户金额分布 Top 10</h2></div>
-          <div id="pfClientChart" class="chart-host"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h2>周期内收到的询盘 · 当前状态</h2></div>
-          <div id="pfFunnel" class="funnel-host"></div>
-        </div>
-      </div>
-    <div class="panel analytics-detail"><div class="panel-head"><h2>订单明细 · 大单与异常</h2><span id="pfAlertSummary" class="muted"></span></div><div id="pfDeals" class="table-wrap"></div></div></section>
+  <div class="g2">
+    <section class="card" aria-labelledby="performance-th">
+      <div class="card-h"><div><h2 id="performance-th">客户成交金额 Top 10</h2><div class="sub">本周期 · CNY · 占比</div></div></div>
+      <ol class="toplist" id="pfClientChart"></ol>
+    </section>
+    <div style="display:grid;gap:16px;align-content:start">
+      <section class="card" aria-labelledby="performance-sth">
+        <div class="card-h"><div><h2 id="performance-sth">订单状态</h2><div class="sub">本周期生产中及后续订单</div></div><div class="r"><select class="in" id="pfStatusWeek" data-no-combo aria-label="订单状态统计范围"><option value="">所选周期</option></select></div></div>
+        <div id="pfStatus"></div>
+      </section>
+      <section class="card" aria-labelledby="performance-ih">
+        <div class="card-h"><div><h2 id="performance-ih">本周期收到的询盘</h2><div class="sub">当前状态占比，不代表阶段转化率</div></div><div class="r"><a class="link" href="#/inqstats">去询盘分析 →</a></div></div>
+        <div id="pfFunnel"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card analytics-detail" aria-labelledby="performance-dh">
+    <div class="card-h"><div><h2 id="performance-dh">订单明细 · 大单与异常</h2><div class="sub" id="pfAlertSummary"></div></div>
+      <div class="r"><div class="chips" id="pfDealChips" role="group" aria-label="订单筛选"></div><div id="pfColumnTools"></div></div></div>
+    <div class="tbl-wrap table-wrap" id="pfDeals"></div>
+  </section>
+</section>
 
     <!-- ============ 计算器 ============ -->
     <section id="view-calc" class="view">
@@ -1076,47 +1171,13 @@
 
     <!-- ============ 任务与日历 ============ -->
     <section id="view-tasks" class="view">
-      <div class="panel-head row">
-        <h2>任务与日历</h2>
-        <div class="row-right">
-          <select id="taskTypeFilter" class="mini-select">
-            <option value="">全部类型</option>
-            <option value="待办">待办</option>
-            <option value="电话">电话</option>
-            <option value="会议">会议</option>
-            <option value="邮件">邮件</option>
-            <option value="其他">其他</option>
-          </select>
-          <label class="chk-inline"><input type="checkbox" id="taskMineOnly" checked /> 仅我看</label>
-          <button id="taskAdd" class="btn-primary">+ 新建任务</button>
-        </div>
-      </div>
-      <div class="subtabs">
-        <button class="subtab active" data-subtab="list">列表</button>
-        <button class="subtab" data-subtab="kanban">看板</button>
-        <button class="subtab" data-subtab="calendar">日历</button>
-      </div>
-      <div id="sub-task-list" class="subview active">
-        <div class="level-filter" id="taskFilterBar">
-          <button class="lf-chip active" data-st="open">待办</button>
-          <button class="lf-chip" data-st="overdue">逾期</button>
-          <button class="lf-chip" data-st="done">已完成</button>
-          <button class="lf-chip" data-st="all">全部</button>
-        </div>
-        <div id="taskListBody" class="task-list"></div>
-      </div>
-      <div id="sub-task-cal" class="subview">
-        <div class="cal-bar">
-          <button class="btn-mini" id="calPrev">◀</button>
-          <span id="calTitle" class="cal-title"></span>
-          <button class="btn-mini" id="calNext">▶</button>
-          <button class="btn-mini" id="calToday">今天</button>
-        </div>
-        <div id="taskCalHost" class="cal-host"></div>
-      </div>
-      <div id="sub-task-kanban" class="subview">
-        <div id="taskKanbanHost" class="kb-host"></div>
-      </div>
+<div class="crm-prototype sales-prototype tasks-prototype" id="live-tasks">
+<div class="head"><div><div class="eyebrow">Tasks &amp; Calendar</div><h2>任务日历</h2><p id="tk-headSub"></p></div><div class="r"><button class="btn btn-pri" id="tk-addBtn" type="button"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#crmi-plus"/></svg>新建任务</button></div></div>
+<div class="attention-row" id="tk-attention" aria-label="快速筛选"></div>
+<div class="fbar" id="tk-fbar"><div class="seg" id="tk-viewSeg" role="tablist" aria-label="视图"><button type="button" role="tab" data-view="board" aria-selected="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#crmi-board"/></svg>看板</button><button type="button" role="tab" data-view="calendar" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><use href="#crmi-cal"/></svg>日历</button></div><label class="q" id="tk-qWrap"><span class="sr">搜索任务</span><svg class="i"><use href="#crmi-search"/></svg><input id="tk-q" placeholder="任务标题、关联客户…" autocomplete="off"><button class="clr" type="button" aria-label="清除搜索"><svg class="i"><use href="#crmi-x"/></svg></button></label><div class="sel"><label class="sr" for="tk-fType">类型</label><select data-no-combo id="tk-fType"></select><svg class="i"><use href="#crmi-chev"/></svg></div><div class="sel"><label class="sr" for="tk-fOwner">负责人</label><select data-no-combo id="tk-fOwner"></select><svg class="i"><use href="#crmi-chev"/></svg></div><button class="btn btn-ghost reset" id="tk-reset" type="button">重置</button><span class="count" id="tk-count"></span></div>
+<section class="tk-board" id="tk-board" aria-label="任务看板"></section>
+<section class="card tk-cal" id="tk-cal" aria-label="任务日历" hidden></section>
+</div>
     </section>
 
     <!-- ============ 报表导出 ============ -->
@@ -1214,40 +1275,47 @@
     <div class="cDrawer-body" id="clientDrawerBody"></div>
   </aside>
 
-  <script src="app.js?v=20261014hide1"></script>
-  <script src="sales-detail.js?v=20260929sales1"></script>
+  <script src="home.js?v=20261117crm1"></script>
+  <script src="crm-prototype-common.js?v=20261117crm1"></script>
+  <script src="client-workspace.js?v=20261117crm1"></script>
+  <script src="client-dedup.js?v=20261016dedup1"></script>
+  <script src="order-workflow.js?v=20261119receipt1"></script>
+  <script src="sales-workspace.js?v=20261119receipt1"></script>
+  <script src="app.js?v=20261120nav1"></script>
+  <script src="sales-detail.js?v=20261107flow1"></script>
   <script src="docs.js?v=20260929sales1"></script>
-  <script src="inquiry-links.js?v=20261013auto1"></script>
-  <script src="quotations.js?v=20261013inquiry2"></script>
-  <script src="inquiry.js?v=20261013design1"></script>
+  <script src="inquiry-links.js?v=20261117crm1"></script>
+  <script src="quotations.js?v=20261117sales1"></script>
+  <script src="inquiry.js?v=20261117crm1"></script>
   <script src="inquiry-intake.js?v=20261013mcp1"></script>
-  <script src="inquiry-workspace.js?v=20261013focus1"></script>
+  <script src="inquiry-workspace.js?v=20261117crm1"></script>
   <script src="emails.js?v=20260914sort"></script>
   <script src="products.js?v=20261010categoryimages1"></script>
   <script src="catalog-drawer.js?v=20261009layout1"></script>
 <script src="quote-history.js?v=20261008b"></script>
-  <script src="ops.js?v=20260929sales1"></script>
-  <script src="comms.js?v=20260914sort"></script>
+  <script src="ops.js?v=20261107flow1"></script>
+  <script src="comms.js?v=20261117crm1"></script>
   <script src="mail.js?v=20260929refine1"></script>
-  <script src="performance-viz.js?v=20260929refine1"></script>
-  <script src="performance.js?v=20260929refine1"></script>
-  <script src="ai.js?v=20260930pdf3"></script>
+  <script src="performance-viz.js?v=20261116dash2"></script>
+  <script src="performance.js?v=20261116dash2"></script>
+  <script src="ai.js?v=20261107flow1"></script>
   <script src="calc.js?v=20260923b"></script>
-  <script src="settings.js?v=20261014hide1"></script>
+  <script src="settings.js?v=20261116flow1"></script>
   <script src="audit.js?v=20260810a"></script>
-  <script src="tasks.js?v=20260914sort"></script>
+  <script src="tasks.js?v=20261120nav1"></script>
   <script src="contacts.js?v=20260810g"></script>
   <script src="reports.js?v=20260810g"></script>
-  <script src="inqstats.js?v=20260928analytics1"></script>
+  <script src="inqstats.js?v=20261116dash2"></script>
   <script src="chatlog.js?v=20260914sort"></script>
   <script src="wa.js?v=20260914b"></script>
   <script src="reminders.js?v=20260921d"></script>
   <script src="knowledge.js?v=20261008b"></script>
   <script src="crm-import.js?v=20260827c"></script>
   <script src="combo.js?v=20260929interaction1"></script>
-  <script src="ui-layout.js?v=20260929blue1"></script>
+  <script src="ui-layout.js?v=20261116dash2"></script>
   <script src="data-status.js?v=20260914a"></script>
   <script src="idle-refresh.js?v=20260921a"></script>
   <script src="update-notice.js?v=20260921d"></script>
+  <script src="redesign.js?v=20261116dash2"></script>
 </body>
 </html>

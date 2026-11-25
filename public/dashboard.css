@@ -1,0 +1,234 @@
+/* Dashboard geometry and components from prototype/index.html. Scoped here so
+   legacy business-page styles cannot change the dashboard's intrinsic sizing. */
+html[data-theme-style="flow"] body #view-dashboard {
+  --s-new:#2f5bd3;--s-new-bg:#eaf0fd;--s-quote:#9a6200;--s-quote-bg:#fff4db;
+  --s-wait:#6a4bb8;--s-wait-bg:#f1edfb;--s-neg:#0b7480;--s-neg-bg:#e3f4f5;
+  --s-won:#1b7a4b;--s-won-bg:#e5f4ec;--s-lost:#6b7287;--s-lost-bg:#eff0f3;
+  min-width:0;max-width:100%;
+}
+html[data-theme-style="flow"] body #view-dashboard.active { display:block; }
+html[data-theme-style="flow"] body #view-dashboard > * { min-width:0;max-width:100%; }
+html[data-theme-style="flow"] body #view-dashboard .welcome-row {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end;
+  padding:0;margin:0 0 18px;min-height:0;
+}
+html[data-theme-style="flow"] body #view-dashboard .welcome h1 { font-size:24px;line-height:1.55; }
+html[data-theme-style="flow"] body #view-dashboard .welcome p { font-size:14.5px;margin-top:6px; }
+html[data-theme-style="flow"] body #view-dashboard .page-eyebrow { display:none; }
+html[data-theme-style="flow"] body #view-dashboard .dashboard-quick { grid-area:auto;order:0;align-self:end;margin:0;padding:0;justify-self:auto; }
+html[data-theme-style="flow"] body #view-dashboard .quick-actions { gap:8px; }
+html[data-theme-style="flow"] body #view-dashboard .qa-icon { display:block;width:16px;height:16px;flex:none;background:none;border:0; }
+html[data-theme-style="flow"] body #view-dashboard .qa-icon svg { display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+html[data-theme-style="flow"] body #view-dashboard .qa-btn { height:36px;min-height:36px;padding:0 14px;background:white;color:var(--ink);border:1px solid var(--line);font-weight:500; }
+html[data-theme-style="flow"] body #view-dashboard .qa-btn:first-child { background:white;color:var(--ink);border-color:var(--line); }
+html[data-theme-style="flow"] body #view-dashboard .qa-btn:hover { background:#fafbfc;border-color:#c3c9d6; }
+
+/* Signature time-zone board: a flush navy summary and four equal clock cells. */
+html[data-theme-style="flow"] body #view-dashboard #worldClocks.ftw-clock-panel {
+  display:grid;grid-template-columns:220px minmax(0,1fr);align-items:stretch;gap:0;
+  padding:0;margin:0 0 16px;min-height:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+}
+html[data-theme-style="flow"] body #view-dashboard .db-clock-summary { background:var(--navy-900);color:#fff;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;position:relative;min-width:0;gap:14px; }
+.db-clock-summary::after { content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,#ffffff09 0 1px,transparent 1px 24px);pointer-events:none; }
+.db-clock-label { font-size:12.5px;color:#a6afcb; }
+.db-clock-count { font:700 40px/1 var(--num);margin-top:8px; }
+.db-clock-count small { font:500 14px var(--sans);color:#c7cde0;margin-left:6px; }
+.db-clock-local { font-size:12.5px;color:#a6afcb; }
+.db-clock-local b { font:600 15px var(--num);color:var(--yellow);margin-left:6px; }
+html[data-theme-style="flow"] body #view-dashboard .db-clock-summary .ftw-clock-actions { display:flex;gap:6px;flex-wrap:wrap;margin-top:10px; }
+html[data-theme-style="flow"] body #view-dashboard .ftw-clock-actions button { border:1px solid #ffffff40;background:none;color:#d6dcee;border-radius:5px;height:28px;min-height:28px;padding:0 8px;font-size:12px;white-space:nowrap;cursor:pointer; }
+html[data-theme-style="flow"] body #view-dashboard .ftw-clock-actions button:hover { color:#fff;border-color:#fff; }
+.db-clock-board { min-width:0;display:flex;flex-direction:column; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;flex:1; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item { min-width:0;padding:14px 16px;background:white;border:0;border-left:1px solid var(--line-2);border-radius:0; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item:nth-child(n+5) { border-top:1px solid var(--line-2); }
+.db-clock-heading { display:flex;justify-content:space-between;align-items:center;gap:6px; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-city { font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-state { font-size:11.5px;font-weight:400;padding:1px 7px;border-radius:10px;white-space:nowrap;flex:none;background:var(--s-lost-bg);color:var(--s-lost);margin:0; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks [data-working=yes] .ftw-clock-state { color:var(--s-won);background:var(--s-won-bg); }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks [data-soon=yes] .ftw-clock-state { color:var(--s-quote);background:var(--s-quote-bg); }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item time { font:700 26px/1.1 var(--num);display:block;margin:6px 0 0;color:var(--ink); }
+.db-clock-day-offset { font:500 12px var(--sans);color:var(--muted);margin-left:4px; }
+.db-clock-day { position:relative;height:6px;border-radius:3px;background:var(--line-2);margin-top:10px; }
+.db-clock-working { position:absolute;top:0;bottom:0;border-radius:3px;background:#cfe7da; }
+.db-clock-now { position:absolute;top:-3px;width:2px;height:12px;border-radius:1px;background:var(--ink);z-index:1; }
+.db-clock-who { font-size:12px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+html[data-theme-style="flow"] body #view-dashboard .db-visually-hidden { position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks[data-collapsed=true] { grid-template-columns:1fr; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks[data-collapsed=true] .db-clock-summary { flex-direction:row;align-items:center; }
+html[data-theme-style="flow"] body #view-dashboard #worldClocks[data-collapsed=true] .db-clock-board { display:none; }
+
+/* KPI strip. Explicit auto heights prevent the old 100% card height from
+   stretching every row to the height of the entire multi-row strip. */
+html[data-theme-style="flow"] body #view-dashboard > .stat-row {
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;margin:0 0 16px;
+  border:1px solid var(--line);border-radius:8px;background:white;overflow:hidden;align-items:stretch;
+}
+html[data-theme-style="flow"] body #view-dashboard .stat-card {
+  display:block;height:auto;min-height:0;min-width:0;max-width:100%;position:relative;padding:16px 20px;
+  border:0;border-left:1px solid var(--line-2);border-radius:0;background:none;box-shadow:none;cursor:pointer;
+}
+html[data-theme-style="flow"] body #view-dashboard .stat-card:first-child { border-left:0; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card:hover { background:#fafbfc;transform:none; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card::after,html[data-theme-style="flow"] body #view-dashboard .stat-card::before { display:none; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card.db-attention::after { display:block;content:"";position:absolute;inset:0 0 auto;width:100%;height:3px;border-radius:0;background:var(--yellow); }
+html[data-theme-style="flow"] body #view-dashboard .stat-card .sc-title { display:flex;align-items:center;gap:6px;min-height:0;font-size:12.5px;font-weight:400;line-height:1.55;color:var(--muted); }
+.db-kpi-flag { font-size:11px;font-weight:600;color:var(--danger);background:var(--danger-soft);padding:0 6px;border-radius:8px;white-space:nowrap; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card .sc-num { display:block;min-height:0;font:700 30px/1.1 var(--num);letter-spacing:0;color:var(--ink);margin:8px 0 0;white-space:nowrap; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card .sc-unit { font:500 13px var(--sans);color:var(--muted);margin-left:3px; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card .sc-sub { display:block;margin:4px 0 0;min-height:0;font-size:12px;line-height:1.55;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+html[data-theme-style="flow"] body #view-dashboard .stat-card .dash-card-state:empty { display:none; }
+
+/* Prototype card geometry and rows. Avoid the old todo/opp flex classes. */
+html[data-theme-style="flow"] body #view-dashboard .section-grid,
+html[data-theme-style="flow"] body #view-dashboard .flow-dashboard-bottom { display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:16px;margin:0 0 16px;align-items:start; }
+html[data-theme-style="flow"] body #view-dashboard .section-grid > .panel { order:0; }
+html[data-theme-style="flow"] body #view-dashboard .panel { min-width:0;max-width:100%;padding:0;margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:none; }
+html[data-theme-style="flow"] body #view-dashboard .db-card-head { display:flex;align-items:center;gap:12px;padding:16px 20px 12px;min-width:0; }
+.db-card-head h2 { margin:0;font-size:15px;font-weight:600;line-height:1.55; }
+.db-card-sub { font-size:12.5px;color:var(--muted); }
+.db-card-actions { margin-left:auto;display:flex;gap:6px;align-items:center;min-width:0; }
+html[data-theme-style="flow"] body #view-dashboard .db-link { font-size:13px;color:var(--navy-600);font-weight:500;background:none;border:0;cursor:pointer;padding:4px 6px;border-radius:5px;white-space:nowrap; }
+html[data-theme-style="flow"] body #view-dashboard .db-link:hover { background:var(--bg); }
+html[data-theme-style="flow"] body #view-dashboard .db-small-button { height:32px;min-height:32px;padding:0 10px;gap:6px;font-size:13px; }
+.db-small-button svg,.db-todo-actions svg { width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+html[data-theme-style="flow"] body #view-dashboard .flow-todo-filters { display:flex;gap:2px;background:var(--bg);padding:3px;border-radius:7px;flex-basis:auto; }
+html[data-theme-style="flow"] body #view-dashboard .flow-todo-filters button { display:flex;gap:6px;align-items:center;white-space:nowrap;height:28px;padding:0 10px;font-size:12.5px;color:var(--muted);border:0;border-radius:5px;cursor:pointer;background:none; }
+html[data-theme-style="flow"] body #view-dashboard .flow-todo-filters button[aria-pressed=true] { color:var(--ink);font-weight:600;background:white;box-shadow:0 1px 2px #0b143014; }
+.db-tab-count { font:600 11.5px var(--num);color:var(--muted); }
+[aria-pressed=true] .db-tab-count { color:var(--danger); }
+html[data-theme-style="flow"] body #view-dashboard .todo-list { padding:0 8px 8px;max-height:none;overflow:visible; }
+.db-todo-row { display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:11px 12px;border-radius:6px;border-top:1px solid var(--line-2);min-width:0; }
+.db-todo-row:first-child { border-top:0; }
+.db-todo-row:hover { background:#fafbfc; }
+html[data-theme-style="flow"] body #view-dashboard .db-check { appearance:none;display:grid;place-items:center;flex:none;width:18px;height:18px;min-height:0;min-width:0;border:1.5px solid #b9bfcc;border-radius:5px;margin:0;padding:0;background:white;color:var(--navy-800);cursor:pointer; }
+.db-check:checked { background:var(--navy-800)!important;border-color:var(--navy-800)!important; }
+.db-check:checked::after { content:"";width:9px;height:5px;border:solid white;border-width:0 0 2px 2px;transform:rotate(-45deg) translate(1px,-1px); }
+.db-check svg { width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.5;opacity:0; }
+.db-check:hover svg,.db-check:focus-visible svg { opacity:1; }
+html[data-theme-style="flow"] body #view-dashboard .flow-todo-open { display:block;min-width:0;text-align:left;border:0;background:none;padding:0;color:var(--ink);cursor:pointer; }
+.db-todo-title { display:block;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.db-todo-meta { display:flex;gap:10px;align-items:center;font-size:12.5px;color:var(--muted);margin-top:2px;min-width:0; }
+.db-todo-meta > span:last-child { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0; }
+.db-stage { display:inline-flex;gap:5px;align-items:center;flex:none;height:20px;padding:0 8px;border-radius:10px;font-size:11.5px;font-weight:600;white-space:nowrap;color:var(--stage-color);background:var(--stage-bg); }
+.db-stage::before { content:"";width:6px;height:6px;border-radius:50%;background:currentColor; }
+.db-stage-new { --stage-color:var(--s-new);--stage-bg:var(--s-new-bg); }
+.db-stage-quote { --stage-color:var(--s-quote);--stage-bg:var(--s-quote-bg); }
+.db-stage-wait { --stage-color:var(--s-wait);--stage-bg:var(--s-wait-bg); }
+.db-stage-neg { --stage-color:var(--s-neg);--stage-bg:var(--s-neg-bg); }
+.db-stage-won { --stage-color:var(--s-won);--stage-bg:var(--s-won-bg); }
+.db-stage-lost { --stage-color:var(--s-lost);--stage-bg:var(--s-lost-bg); }
+.db-stage-task { --stage-color:var(--navy-700);--stage-bg:#e9ecf5; }
+.db-due { font:600 12.5px var(--num);white-space:nowrap;text-align:right; }
+.db-due.over { color:var(--danger); }
+.db-due small { display:block;font:400 11.5px var(--sans);color:var(--muted); }
+.db-todo-actions { display:flex;gap:2px;opacity:0; }
+.db-todo-row:hover .db-todo-actions,.db-todo-row:focus-within .db-todo-actions { opacity:1; }
+html[data-theme-style="flow"] body #view-dashboard .db-todo-actions button { display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;background:none;border-radius:6px;color:var(--muted);cursor:pointer; }
+.db-todo-actions button:hover { background:var(--bg)!important;color:var(--ink)!important; }
+.db-todo-foot { padding:0 12px 6px; }
+.db-funnel { display:flex;height:12px;border-radius:6px;overflow:hidden;margin:4px 20px 14px;gap:2px; }
+.db-funnel span { display:block;height:100%; }
+.db-pipeline-stages { padding:0 8px 10px; }
+.db-pipeline-row { display:grid;grid-template-columns:auto minmax(12px,1fr) 28px 96px;gap:12px;align-items:center;width:100%;padding:9px 12px;border:0;background:none;border-radius:6px;cursor:pointer;text-align:left; }
+.db-pipeline-row:hover { background:#fafbfc; }
+.db-pipeline-count { font:700 16px var(--num);text-align:right; }
+.db-pipeline-amount { font:500 13px var(--num);color:var(--muted);text-align:right; }
+.db-pipeline-track { height:4px;border-radius:2px;background:var(--line-2);overflow:hidden; }
+.db-pipeline-track i { display:block;height:100%;border-radius:2px; }
+.db-pipeline-foot { display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line-2);padding:12px 20px 16px;font-size:12.5px;color:var(--muted); }
+.db-pipeline-foot b { font:700 20px var(--num);color:var(--ink); }
+
+/* Revenue uses the supplied bar chart, with summary above and a fixed-height
+   plot; a small internal chart scroller keeps all twelve labels legible. */
+html[data-theme-style="flow"] body #view-dashboard #revenueTrend { position:relative;height:auto;min-height:0;padding:0; }
+.db-chart-summary { display:flex;flex-wrap:wrap;gap:8px 28px;padding:0 20px 4px; }
+.db-chart-summary span { display:block;font-size:12px;color:var(--muted); }
+.db-chart-summary b { font:700 20px var(--num); }
+.db-chart-unit { margin-left:auto;align-self:end; }
+.db-chart { padding:0 20px 16px;position:relative;min-width:0; }
+.db-chart-scroll { overflow-x:auto;overflow-y:hidden; }
+html[data-theme-style="flow"] body #view-dashboard .db-chart svg { display:block;width:100%;min-width:0;height:220px;min-height:220px;overflow:hidden; }
+.db-chart .db-chart-grid { stroke:var(--line-2); }
+.db-chart .db-chart-axis { font:11.5px var(--num);fill:#9aa0b2; }
+.db-chart .db-revenue-bar { fill:#d5dae6;cursor:pointer; }
+.db-chart .db-revenue-bar.current { fill:var(--navy-800); }
+.db-chart .db-revenue-bar:hover,.db-chart .db-revenue-bar:focus { fill:var(--navy-600);outline:none; }
+.db-chart-tooltip { position:absolute;z-index:2;max-width:calc(100% - 24px);background:var(--navy-950);color:white;font-size:12px;padding:7px 10px;border-radius:6px;pointer-events:none;white-space:nowrap; }
+.db-chart-tooltip b { display:block;font:700 14px var(--num); }
+.db-chart-tooltip[hidden] { display:none; }
+html[data-theme-style="flow"] body #view-dashboard .flow-deals-column { display:grid;grid-template-columns:minmax(0,1fr);gap:16px;min-width:0;align-content:start; }
+html[data-theme-style="flow"] body #view-dashboard #oppList { min-width:0;max-height:none;overflow:visible;padding:0 8px 8px; }
+.db-deal { display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;max-width:100%;padding:10px 12px;border:0;border-top:1px solid var(--line-2);border-radius:6px;text-align:left;background:none;color:inherit;cursor:pointer; }
+.db-deal:first-child { border-top:0; }
+.db-deal:hover { background:#fafbfc; }
+.db-deal-avatar { width:34px;height:34px;border-radius:7px;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;font:700 12px var(--num);color:var(--ink-2); }
+.db-deal-content { min-width:0;overflow:hidden; }
+.db-deal-name,.db-deal-product { display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.db-deal-name { font-size:14px;font-weight:500; }
+.db-deal-product { font-size:12.5px;color:var(--muted); }
+.db-deal-right { text-align:right; }
+.db-deal-right b { display:block;font:700 14px var(--num);margin-bottom:3px;white-space:nowrap; }
+.db-fx-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:0 20px 16px; }
+.db-fx-pair { display:flex;justify-content:space-between;gap:8px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line-2);min-width:0; }
+.db-fx-pair:nth-child(odd) { padding-right:16px; }
+.db-fx-pair:nth-child(even) { padding-left:16px;border-left:1px solid var(--line-2); }
+.db-fx-pair span { font-size:12.5px;color:var(--muted);white-space:nowrap; }
+.db-fx-pair b { font:700 16px var(--num); }
+.db-fx-notice { padding:0 20px 12px;font-size:12px;color:var(--danger); }
+.db-fx-notice[hidden] { display:none; }
+@media(max-width:1360px) {
+  html[data-theme-style="flow"] body #view-dashboard > .stat-row { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card:nth-child(n+4) { border-top:1px solid var(--line-2); }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card:nth-child(4) { border-left:0; }
+}
+@media(max-width:1100px) {
+  html[data-theme-style="flow"] body #view-dashboard .welcome-row { grid-template-columns:minmax(0,1fr); }
+  html[data-theme-style="flow"] body #view-dashboard .section-grid,
+  html[data-theme-style="flow"] body #view-dashboard .flow-dashboard-bottom { grid-template-columns:minmax(0,1fr); }
+  html[data-theme-style="flow"] body #view-dashboard .flow-deals-column { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:820px) {
+  html[data-theme-style="flow"] body #view-dashboard .welcome h1 { font-size:21px; }
+  html[data-theme-style="flow"] body #view-dashboard .qa-btn { flex:1 1 calc(50% - 8px); }
+  html[data-theme-style="flow"] body #view-dashboard #worldClocks.ftw-clock-panel { grid-template-columns:minmax(0,1fr); }
+  html[data-theme-style="flow"] body #view-dashboard .db-clock-summary { flex-direction:row;align-items:center;padding:14px 16px; }
+  .db-clock-count { font-size:30px;margin-top:2px; }
+  .db-clock-local { text-align:right; }
+  html[data-theme-style="flow"] body #view-dashboard .db-clock-summary .ftw-clock-actions { justify-content:flex-end; }
+  html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item { padding:12px; }
+  html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item:nth-child(odd) { border-left:0; }
+  html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item:nth-child(n+3) { border-top:1px solid var(--line-2); }
+  html[data-theme-style="flow"] body #view-dashboard #worldClocks .ftw-clock-item time { font-size:22px; }
+  html[data-theme-style="flow"] body #view-dashboard > .stat-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card:nth-child(n) { padding:16px 20px;border-left:1px solid var(--line-2);border-top:0; }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card:nth-child(n+3) { border-top:1px solid var(--line-2); }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card:nth-child(odd) { border-left:0; }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card .sc-num { font-size:26px; }
+  html[data-theme-style="flow"] body #view-dashboard .flow-deals-column { grid-template-columns:minmax(0,1fr); }
+  html[data-theme-style="flow"] body #view-dashboard .db-card-head { flex-wrap:wrap;padding:14px 16px 10px; }
+  .db-card-actions { margin-left:0;width:100%;justify-content:space-between; }
+  .db-card-actions:has(.db-link:only-child) { width:auto;margin-left:auto; }
+  .db-todo-row { grid-template-columns:24px minmax(0,1fr) auto;padding:12px 8px; }
+  .db-todo-actions { display:none; }
+}
+@media(max-width:420px) {
+  .db-todo-meta { gap:6px; }
+  .db-todo-row { gap:8px; }
+  .db-due { font-size:11.5px; }
+  .db-pipeline-row { gap:8px;grid-template-columns:auto minmax(12px,1fr) 22px 76px; }
+  .db-fx-pair:nth-child(odd) { padding-right:10px; }
+  .db-fx-pair:nth-child(even) { padding-left:10px; }
+  .db-fx-pair span { font-size:11.5px; }
+}
+
+@media(max-width:360px) {
+  html[data-theme-style="flow"] body #view-dashboard .stat-card:nth-child(n) { padding:14px 12px; }
+  html[data-theme-style="flow"] body #view-dashboard .stat-card .sc-num { font-size:24px; }
+}
+
+html[data-theme-style="flow"] body #view-dashboard .db-card-head h2{margin:0;font-size:15px;font-weight:600;line-height:1.55}
+
+html[data-theme-style="flow"] body #view-dashboard .flow-todo-open{font:inherit;line-height:1.55}
+html[data-theme-style="flow"] body #view-dashboard .db-deal{font:inherit;line-height:1.55}

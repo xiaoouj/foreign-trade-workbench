@@ -5,11 +5,11 @@
 // One supported interface. Migrate old browser preferences without touching business data.
 function applyTheme() {
   const root = document.documentElement;
-  root.dataset.themeStyle = 'blue';
+  root.dataset.themeStyle = 'flow';
   root.removeAttribute('data-theme');
   root.classList.remove('dark');
   ['vibe', 'apple', 't21', 'mc', 'nerv', 'fui'].forEach(key => delete root.dataset[key]);
-  try { LS.set('theme', {brand:'#2563eb', mode:'light', style:'blue'}); LS.set('uiVersion', 4); } catch {}
+  try { LS.set('theme', {brand:'#17255a', mode:'light', style:'flow'}); LS.set('uiVersion', 5); } catch {}
 }
 applyTheme();
 
@@ -22,7 +22,7 @@ function renderSettings() {
 
     <div class="card set-card">
       <div class="card-head"><div class="card-title">界面外观</div></div>
-      <p class="muted">统一蓝色界面 · 工作台与客户资料全新布局</p>
+      <p class="muted">深蓝与亮黄 · 统一工作台和业务页面</p>
     </div>
 
     <div class="card set-card">

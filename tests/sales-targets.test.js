@@ -25,6 +25,11 @@ test('company and personal targets enforce roles, yearly cap and concurrent writ
  const winner=concurrent[0].status===200?a:b;
  assert.equal((await put(winner.token,{yearMonthly:{'2026-03':-1}})).status,400);
  assert.equal((await put(winner.token,{yearMonthly:{'2026-13':1}})).status,400);
+ const adminCompany=await get(tok,'/api/sales?scope=company');
+ assert.deepEqual(adminCompany.memberTargets[winner.id],winner.id===a.id?{'2026-01':60}:{'2026-02':60});
+ assert.deepEqual(adminCompany.memberTargets[manager.id],{});
+ assert.equal(company.memberTargets,undefined);
+ assert.equal((await get(manager.token,'/api/sales?scope=company')).memberTargets,undefined);
  const person=await get(tok,'/api/sales?userId='+winner.id);assert.equal(person.canEdit,false);assert.equal(person.scope,'personal');
  // Company actual includes other owners, but only aggregates leave the endpoint.
  await request('/api/orders','POST',{clientName:'PRIVATE-A',owner:a.id,orderDate:'2026-01-01',amount:20,currency:'CNY',status:'已完成'},tok);

@@ -16,9 +16,17 @@ import * as dal from './db/dal.js';
 import {mergeQuoteVersions} from './quote-version-merge.js';
 import {sameCustomer, reconcileInquiries, provisionQuoteInquiry} from './inquiry-link.js';
 import {normalizeSalesFields, createQuote, reviseQuote, quoteNumberKey} from './sales-records.js';
+import './public/order-workflow.js';
+const orderWorkflow = globalThis.FTWOrderWorkflow;
+function normalizeOrderFields(input) {
+  const out=normalizeSalesFields(input);
+  if ('status' in out && ![...orderWorkflow.statuses,...orderWorkflow.legacyStatuses].includes(out.status)) throw new Error('无效订单状态');
+  return out;
+}
 import { createCatalogRoutes } from './catalog-routes.js';
 import { createCatalogStore } from './catalog-store.js';
 import { createInquiryIntakeRoutes } from './inquiry-intake.js';
+import { createChatSyncRoutes } from './chat-sync.js';
 import { quoteProductLines, visibleHistory } from './product-catalog.js';
 // AI 管家编排层（2026-08-26 P0）：工具协议 + 查询工具服务端执行；写动作返回前端确认后走现有 REST（继承 RBAC/审计）
 import { handleAiAgent } from './ai-agent.js';
@@ -46,6 +54,7 @@ const MAIL_FILE = path.join(DATA_DIR, 'mail.json');
 const MAIL_SENT_FILE = path.join(DATA_DIR, 'mail-sent.json');
 const SALES_FILE = path.join(DATA_DIR, 'sales.json');
 const QUOTATIONS_FILE = path.join(DATA_DIR, 'quotations.json');
+const PACKING_PLANS_FILE = path.join(DATA_DIR, 'packing-plans.json');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
 const CHATS_FILE = path.join(DATA_DIR, 'chats.json');
@@ -69,6 +78,7 @@ const PORT = process.env.PORT || 4173;
 let STORAGE_MODE = 'json';
 const quoteVersionStore=createCatalogStore({dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal,mode:()=>STORAGE_MODE,journalName:'quote-version-merge-journal.json',mysqlCommit:'commitQuoteVersionMerge'});
 const quoteInquiryStore=createCatalogStore({dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal,mode:()=>STORAGE_MODE,journalName:'quote-inquiry-write-journal.json',mysqlCommit:'commitQuoteInquiry'});
+const quoteOrderStore=createCatalogStore({dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal,mode:()=>STORAGE_MODE,journalName:'quote-order-write-journal.json',mysqlCommit:'commitQuoteOrder'});
 const catalogStore = createCatalogStore({ dataDir: DATA_DIR, read: readJson, write: writeJson, jsonRead, jsonWrite, dal, mode: () => STORAGE_MODE });
 const inquiryIntakeStore = createCatalogStore({ dataDir:DATA_DIR,read:readJson,write:writeJson,jsonRead,jsonWrite,dal:{commitCatalog:dal.commitInquiryIntake},mode:()=>STORAGE_MODE,journalName:'inquiry-intake-write-journal.json' });
 const inquiryIntakeRoutes = createInquiryIntakeRoutes({
@@ -80,6 +90,13 @@ const catalogRoutes = createCatalogRoutes({ root: __dirname,
   read: base => readJson(path.join(DATA_DIR, base + '.json'), []),
   write: (base, rows) => writeJson(path.join(DATA_DIR, base + '.json'), rows),
   commit: catalogStore.commit, body: readBody, send: sendJson, audit: logAudit });
+const chatSyncRoutes = createChatSyncRoutes({
+  read: base => readJson(path.join(DATA_DIR, base + '.json'), []),
+  write: (base, rows) => writeJson(path.join(DATA_DIR, base + '.json'), rows),
+  body: readBody, send: sendJson, users: () => readUsers().users,
+  resolveAiCfg, joinUrl, aiHeaders, abortAfter,
+  isBusinessManager, canAccessRecord, visibleRecords, logAudit, genId,
+});
 async function enrichQuoteCatalog(input, user, previous = {}) {
   if (!Array.isArray(input.items)) return input;
   const products = await readJson(PRODUCTS_FILE);
@@ -592,11 +609,23 @@ async function getRates(base, symbols) {
 }
 
 // ---------- HTTP 工具 ----------
+function corsHeadersFor(res) {
+  if (res._corsOrigin) {
+    return {
+      'Access-Control-Allow-Origin': res._corsOrigin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      Vary: 'Origin',
+    };
+  }
+  return { 'Access-Control-Allow-Origin': '*' };
+}
 function sendJson(res, code, obj) {
   const body = JSON.stringify(obj);
   // 记下响应里的主键，供审计补全新建记录的 recordId（POST 时 URL 中没有 id）
   if (obj && typeof obj === 'object' && !Array.isArray(obj) && obj.id) res._auditId = obj.id;
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', ...corsHeadersFor(res) });
   res.end(body);
 }
 // Read once at arrival, outside the mutation queue. An aborted or slow upload
@@ -1154,7 +1183,7 @@ async function listSuppFiles(s) {
 // 需要串行执行的写接口：它们都是"读全表 → 改一条 → 写回全表"，并发跑会丢更新
 // （两个人同时改客户，后写的会把先写的整份覆盖掉）。这类操作只是本地毫秒级读写，
 // 排队不影响体验；AI 对话、邮件收发、汇率等耗时接口刻意不入队，避免相互阻塞。
-const WRITE_LOCK_PATHS = /^\/api\/(clients|orders|inquiries|inquiry-drafts|inquiry-mcp|inquiry-mcp-tokens|shipments|products|emails|comms|comm-templates|suppliers|finance|exceptions|sales|settings|users|tasks|contacts|chats|webhook|quotations|knowledge|notifications|system-notices|announcement|crm-imports|upload|mail|ai)\b/;
+const WRITE_LOCK_PATHS = /^\/api\/(packing-plans|clients|orders|inquiries|inquiry-drafts|inquiry-mcp|inquiry-mcp-tokens|chat-sync|shipments|products|emails|comms|comm-templates|suppliers|finance|exceptions|sales|settings|users|tasks|contacts|chats|webhook|quotations|knowledge|notifications|system-notices|announcement|crm-imports|upload|mail|ai)\b/;
 let writeChain = Promise.resolve();
 function serializeWrite(fn) {
   const next = writeChain.then(fn, fn);
@@ -1166,9 +1195,9 @@ const server = http.createServer({ maxHeaderSize: 64 * 1024 }, async (req, res) 
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname;
   const method = req.method;
-  // These AI operations only read business data; keeping them in the write
+  // These AI / read-only operations only read business data; keeping them in the write
   // queue blocks ordinary saves for the duration of the remote model request.
-  const readOnlyAi = method === 'POST' && /^\/api\/ai\/(test|chat|agent)$/.test(p);
+  const readOnlyAi = method === 'POST' && (/^\/api\/ai\/(test|chat|agent)$/.test(p) || /^\/api\/chat-sync\/(match|analyze)$/.test(p));
   try {
     if (!['GET','HEAD','OPTIONS'].includes(method)) await receiveBody(req);
     const run = () => {
@@ -1184,6 +1213,12 @@ const server = http.createServer({ maxHeaderSize: 64 * 1024 }, async (req, res) 
 
 async function handleRequest(req, res, url, p, method) {
   try {
+    const reqOrigin = req.headers.origin || '';
+    if (/^(chrome-extension|moz-extension):\/\//i.test(reqOrigin)) res._corsOrigin = reqOrigin;
+    if (method === 'OPTIONS') {
+      res.writeHead(204, corsHeadersFor(res));
+      return res.end();
+    }
     // ---------- 公开路由 ----------
     if (p === '/api/version' && method === 'GET') {
       res.setHeader('Cache-Control', 'no-store');
@@ -1277,6 +1312,7 @@ async function handleRequest(req, res, url, p, method) {
     req.user = user;
     if(await inquiryIntakeRoutes(req,res,url,p,method,user))return;
     if (await catalogRoutes(req, res, url, p, method, user)) return;
+    if (await chatSyncRoutes(req, res, url, p, method, user)) return;
 
     // ---------- 文件上传（base64 编码，前端用 FileReader 读取后提交） ----------
     // 仅接受 JSON body { filename, data: "base64..." }，存入 data/uploads/，返回访问路径
@@ -1587,23 +1623,15 @@ async function handleRequest(req, res, url, p, method) {
         const all = await readJson(CLIENTS_FILE);
         const va = buildVisibleOwners(user);
         const visible = va ? all.filter((o) => va.has(o.owner)) : all;
-        // 跟进健康度：合并该客户名下询盘的最后跟进/接收日期，得到「上次跟进」虚拟字段（不落盘）
-        if (visible.length && Array.isArray((await readJson(INQ_FILE)))) {
-          try {
-            const inqs = visibleRecords(await readJson(INQ_FILE), user);
-            const byCo = new Map();
-            for (const iq of inqs) {
-              const co = String(iq.clientName || '').trim();
-              if (!co) continue;
-              const ds = byCo.get(co) || new Set();
-              ['lastFollowAt', 'receivedAt'].forEach((k) => { if (iq[k]) ds.add(String(iq[k]).slice(0, 10)); });
-              byCo.set(co, ds);
-            }
-            visible.forEach((c) => {
-              const ds = byCo.get(String(c.company || '').trim());
-              if (ds && ds.size) c.lastFollowAt = [...ds].filter(Boolean).sort().pop();
-            });
-          } catch { /* 非关键增强，失败不影响列表 */ }
+        // Derive recent contact without joining two distinct client IDs by a shared name.
+        if(visible.length){
+          try{
+            const inqs=visibleRecords(await readJson(INQ_FILE),user),byId=new Map(),byName=new Map();
+            const nameKey=value=>String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
+            const day=value=>{if(value==null||value==='')return '';if(/^\d{4}-\d{2}-\d{2}$/.test(String(value)))return String(value);const d=new Date(value);return Number.isFinite(+d)?new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(d):'';};
+            for(const iq of inqs){const map=iq.clientId?byId:byName,key=iq.clientId?String(iq.clientId):nameKey(iq.clientName);if(!key)continue;const dates=map.get(key)||[];dates.push(day(iq.lastFollowAt),day(iq.receivedAt),...(Array.isArray(iq.followLog)?iq.followLog:[]).map(x=>day(x.at)));map.set(key,dates);}
+            visible.forEach(c=>{const dates=[day(c.lastFollowAt),...(Array.isArray(c.followLog)?c.followLog:[]).map(x=>day(x.at)),...(byId.get(String(c.id))||[]),...(byName.get(nameKey(c.company))||[])].filter(Boolean).sort();if(dates.length)c.lastFollowAt=dates.at(-1);});
+          }catch{ /* Contact metadata must not prevent reading the customer list. */ }
         }
         return sendJson(res, 200, visible);
       }
@@ -1617,6 +1645,23 @@ async function handleRequest(req, res, url, p, method) {
         return sendJson(res, 201, item);
       }
     }
+    const clientFollowMatch=p.match(/^\/api\/clients\/([\w-]+)\/followups$/);
+    if(clientFollowMatch&&method==='POST'){
+      const list=await readJson(CLIENTS_FILE),idx=list.findIndex(c=>c.id===clientFollowMatch[1]);
+      if(idx<0)return sendJson(res,404,{error:'客户不存在'});
+      if(!canAccessRecord(user,list[idx].owner))return sendJson(res,403,{error:'无权限操作该客户'});
+      const body=await readBody(req),content=typeof body.content==='string'?body.content.trim():'';
+      if(!content||content.length>8000)return sendJson(res,400,{error:'跟进内容不能为空，最多 8000 字'});
+      if('nextFollowUp' in body){const date=body.nextFollowUp;if(typeof date!=='string'||(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date)))return sendJson(res,400,{error:'下次跟进日期无效'});}
+      if('requestId' in body&&(typeof body.requestId!=='string'||!/^[-\w]{1,128}$/.test(body.requestId)))return sendJson(res,400,{error:'请求标识无效'});
+      const previous=list[idx],logs=Array.isArray(previous.followLog)?previous.followLog:[];
+      const existing=body.requestId&&logs.find(x=>x.requestId===body.requestId&&x.userId===user.id);
+      if(existing){if(existing.content!==content||('nextFollowUp' in body&&existing.nextFollowUp!==body.nextFollowUp))return sendJson(res,409,{error:'此记录已保存，请刷新后追加新记录'});return sendJson(res,200,previous);}
+      const now=Date.now(),entry={id:genId(),content,at:now,by:user.name||user.username,userId:user.id,...(body.requestId?{requestId:body.requestId}:{}),...('nextFollowUp' in body?{nextFollowUp:body.nextFollowUp}:{})};
+      list[idx]={...previous,followLog:[...logs,entry],lastFollowAt:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now)),updatedAt:now,...('nextFollowUp' in body?{nextFollowUp:body.nextFollowUp}:{})};
+      await writeJson(CLIENTS_FILE,list);return sendJson(res,201,list[idx]);
+    }
+
     const cm = p.match(/^\/api\/clients\/([\w-]+)$/);
     if (cm && (method === 'PUT' || method === 'DELETE')) {
       const list = await readJson(CLIENTS_FILE);
@@ -1629,6 +1674,7 @@ async function handleRequest(req, res, url, p, method) {
         return sendJson(res, 200, { ok: true });
       }
       const body = await readBody(req);
+      delete body.followLog; // Follow-up history is appended only through the serialized endpoint.
       list[idx] = { ...list[idx], ...body, id: cm[1], updatedAt: Date.now() };
       await writeJson(CLIENTS_FILE, list);
       return sendJson(res, 200, list[idx]);
@@ -1642,7 +1688,7 @@ async function handleRequest(req, res, url, p, method) {
       if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(k => !['status','owner','ownerName'].includes(k))) return sendJson(res, 400, {error:'不支持的批量修改字段'});
       const patch = {updatedAt:Date.now()};
       if ('status' in input) {
-        if (!['待确认','已确认','生产中','已发货','已收款','已完成','已取消'].includes(input.status)) return sendJson(res, 400, {error:'无效订单状态'});
+        if (![...orderWorkflow.statuses,...orderWorkflow.legacyStatuses].includes(input.status)) return sendJson(res, 400, {error:'无效订单状态'});
         patch.status = input.status;
       }
       if ('owner' in input) {
@@ -1663,6 +1709,34 @@ async function handleRequest(req, res, url, p, method) {
       return sendJson(res,200,{succeeded,failed,patch});
     }
 
+    // Saved packing plans inherit access from the linked order, including after reassignment.
+    if (p === '/api/packing-plans' && (method === 'GET' || method === 'POST')) {
+      const orders = await readJson(ORDERS_FILE), plans = await readJson(PACKING_PLANS_FILE, []);
+      if (method === 'GET') {
+        const orderId=url.searchParams.get('orderId')||'';
+        if (orderId && !orders.some(o=>o.id===orderId && canAccessRecord(user,o.owner))) return sendJson(res,403,{error:'无权查看该订单的方案'});
+        return sendJson(res,200,plans.filter(plan=>(!orderId||plan.orderId===orderId)&&orders.some(o=>o.id===plan.orderId&&canAccessRecord(user,o.owner))).map(plan=>({id:plan.id,name:plan.name,orderId:plan.orderId,createdAt:plan.createdAt,createdBy:plan.createdBy,containerCount:plan.result?.containers?.length||0})));
+      }
+      const body=await readBody(req),order=orders.find(o=>o.id===body.orderId);
+      if (!order || !canAccessRecord(user,order.owner)) return sendJson(res,403,{error:'无权关联该订单'});
+      const name=String(body.name||'').trim();
+      if (!name || name.length>120 || !body.input || !Array.isArray(body.input.items) || !body.input.container || !body.result || !Array.isArray(body.result.containers) || !Array.isArray(body.result.unpackedSummary) || !body.result.stats || !body.result.container || body.result.containers.length>5000 || body.input.items.length>5000 || body.result.containers.some(bin=>!Array.isArray(bin.placed)||!bin.stats) || body.result.containers.reduce((n,bin)=>n+bin.placed.length,0)>5000) return sendJson(res,400,{error:'方案内容无效或超出限制'});
+      if (JSON.stringify(body).length>4*1024*1024) return sendJson(res,413,{error:'方案内容过大'});
+      const validDimensions=c=>c&&['l','w','h'].every(k=>typeof c[k]==='number'&&Number.isFinite(c[k])&&c[k]>0);
+      const numeric=(v,allowZero=true)=>typeof v==='number'&&Number.isFinite(v)&&(allowZero?v>=0:v>0);
+      if (!validDimensions(body.input.container)||!validDimensions(body.result.container)||!validDimensions(body.result.usable||body.result.container)||body.input.items.some(it=>!validDimensions(it)||!Number.isInteger(it.qty)||it.qty<1)||body.result.containers.some(bin=>bin.placed.some(b=>!b.position||!b.size||!Number.isInteger(b.typeIndex)||b.typeIndex<0||b.typeIndex>=body.input.items.length||!['x','y','z'].every(k=>numeric(b.position[k])&&numeric(b.size[k],false))))) return sendJson(res,400,{error:'方案尺寸或货物数据无效'});
+      const now=Date.now(),item={id:genId(),name,orderId:order.id,owner:order.owner||'',createdAt:now,createdBy:user.id,input:body.input,result:body.result};
+      plans.push(item);await writeJson(PACKING_PLANS_FILE,plans);return sendJson(res,201,{id:item.id,name:item.name,orderId:item.orderId,createdAt:now});
+    }
+    const packingPlan=p.match(/^\/api\/packing-plans\/([\w-]+)$/);
+    if (packingPlan && method === 'GET') {
+      const plan=(await readJson(PACKING_PLANS_FILE,[])).find(x=>x.id===packingPlan[1]);
+      if(!plan)return sendJson(res,404,{error:'方案不存在'});
+      const order=(await readJson(ORDERS_FILE)).find(o=>o.id===plan.orderId);
+      if(!order||!canAccessRecord(user,order.owner))return sendJson(res,403,{error:'无权查看该方案'});
+      return sendJson(res,200,plan);
+    }
+
     // 订单 CRUD
     if (p === '/api/orders') {
       if (method === 'GET') {
@@ -1672,7 +1746,7 @@ async function handleRequest(req, res, url, p, method) {
       }
       if (method === 'POST') {
         let body = await readBody(req);
-        try { body = normalizeSalesFields(body); } catch (error) { return sendJson(res,400,{error:error.message}); }
+        try { body = normalizeOrderFields(body); } catch (error) { return sendJson(res,400,{error:error.message}); }
         const list = await readJson(ORDERS_FILE);
         const now = Date.now();
         const item = { id: genId(), createdAt: now, updatedAt: now, ...withOwner(body, user) };
@@ -1696,13 +1770,62 @@ async function handleRequest(req, res, url, p, method) {
         return sendJson(res, 200, { ok: true });
       }
       let body = await readBody(req);
-        try { body = normalizeSalesFields(body); } catch (error) { return sendJson(res,400,{error:error.message}); }
+        try { body = normalizeOrderFields(body); } catch (error) { return sendJson(res,400,{error:error.message}); }
       const nextOrder={...list[idx],...body,id:om[1],updatedAt:Date.now()};
       await validateInquiryLink(nextOrder,user,'order');
       list[idx]=nextOrder;
       await writeJson(ORDERS_FILE, list);
       await syncInquiryStages(user);
       return sendJson(res, 200, list[idx]);
+    }
+
+    // A single queued, transactional operation owns quotation conversion. Retries reuse the order.
+    const convertQuote = p.match(/^\/api\/quotations\/([\w-]+)\/convert-to-order$/);
+    if (convertQuote && method === 'POST') {
+      const quotes = await readJson(QUOTATIONS_FILE), index = quotes.findIndex(q => q.id === convertQuote[1]);
+      if (index < 0) return sendJson(res,404,{error:'报价单不存在'});
+      const quote = quotes[index];
+      if (!canAccessRecord(user,quote.owner)) return sendJson(res,403,{error:'无权限操作该报价'});
+      const body = await readBody(req), orders = await readJson(ORDERS_FILE);
+      const candidates = orders.filter(o => o.quoteId === quote.id || o.id === quote.orderId);
+      if (candidates.length > 1) return sendJson(res,409,{error:'该报价关联多份订单，请先核对订单关联'});
+      let order = candidates[0];
+      if (order && (!canAccessRecord(user,order.owner) || !sameCustomer(quote,order))) return sendJson(res,403,{error:'无权关联该订单或订单客户不一致'});
+      if (order?.quoteId && order.quoteId !== quote.id) return sendJson(res,409,{error:'关联订单已属于其他报价，请先核对'});
+      if (!order && quote.orderId) return sendJson(res,409,{error:'原关联订单不存在，请先核对订单关联'});
+      const created = !order, now = Date.now();
+      if (created) {
+        if (body.baseVersion != null && Number(body.baseVersion) !== (Number(quote.version)||1)) return sendJson(res,409,{error:'此报价已被修改，请刷新后再转订单'});
+        const orderNo = String(quote.quoteNo||'').trim();
+        if (!orderNo) return sendJson(res,400,{error:'请先填写报价单号，再转订单'});
+        if (orders.some(o => quoteNumberKey(o.orderNo) === quoteNumberKey(orderNo))) return sendJson(res,409,{error:'该编号已有订单，请先核对已有订单，避免重复创建'});
+        if (!Array.isArray(quote.items) || !quote.items.length || quote.items.some(it => !it || !String(it.name||'').trim() || it.qty==null || it.qty==='' || !Number.isFinite(Number(it.qty)) || Number(it.qty)<=0 || it.unitPrice==null || it.unitPrice==='' || !Number.isFinite(Number(it.unitPrice)) || Number(it.unitPrice)<0)) return sendJson(res,400,{error:'请先补齐报价产品名称、有效数量和单价，再转订单'});
+        const client = (await readJson(CLIENTS_FILE)).find(c => c.id === quote.clientId || (!quote.clientId && c.company === quote.clientName));
+        if (client && !canAccessRecord(user,client.owner)) return sendJson(res,403,{error:'无权限关联该客户'});
+        const delivery = new Date(now), days = Number(quote.deliveryDays);
+        if (days) delivery.setDate(delivery.getDate()+days);
+        if (!Number.isFinite(delivery.getTime())) return sendJson(res,400,{error:'报价交货期无效，请先修改报价'});
+        order = normalizeSalesFields({
+          id:genId(),createdAt:now,updatedAt:now,orderNo,quoteId:quote.id,inquiryId:quote.inquiryId||null,
+          clientName:quote.clientName||'',clientId:client?.id||quote.clientId||null,country:client?.country||quote.country||'',
+          owner:quote.owner||user.id,ownerName:quote.ownerName||user.name||'',status:'待确认',
+          currency:quote.currency||'USD',amount:quote.items.reduce((sum,it)=>sum+Number(it.qty)*Number(it.unitPrice),0),
+          paymentTerms:quote.paymentTerms||'',depositPercent:quote.depositPercent??null,deliveryDate:days?delivery.toISOString().slice(0,10):'',
+          items:structuredClone(quote.items),notes:`由报价单 ${quote.quoteNo} (V${quote.version||1}) 转化\n${quote.notes||''}`,
+        });
+        if (!Number.isFinite(order.amount)) return sendJson(res,400,{error:'报价金额无效，请先核对明细'});
+        await validateInquiryLink(order,user,'order');
+        orders.push(order);
+      } else if (!order.quoteId) {
+        order = {...order,quoteId:quote.id,updatedAt:now};
+        await validateInquiryLink(order,user,'order');
+        orders[orders.findIndex(o=>o.id===order.id)] = order;
+      }
+      quotes[index] = reviseQuote(quote,{status:'已转订单',orderId:order.id},user,now);
+      const inquiries = await readJson(INQ_FILE);
+      const synced = reconcileInquiries(inquiries,quotes,orders,{now,actor:user.name||'系统联动',canAccess:r=>canAccessRecord(user,r.owner)});
+      await quoteOrderStore.commit({orders,quotations:quotes,inquiries:synced.inquiries});
+      return sendJson(res,created?201:200,{order,quotation:quotes[index],created});
     }
 
     // 报价单 CRUD（项目型报价：支持分项、版本、状态、关联询盘/订单）
@@ -1720,6 +1843,7 @@ async function handleRequest(req, res, url, p, method) {
         const matches=sameNumber.filter(q=>sameCustomer(q,body));
         if(matches.length>1)return sendJson(res,409,{error:'该编号存在多份报价，请先核对并合并重复记录'});
         if(sameNumber.length&&!matches.length)return sendJson(res,409,{error:'该报价编号已属于其他客户，请核对客户或修改报价编号'});
+        if(body.status==='已转订单'&&matches[0]?.status!=='已转订单')return sendJson(res,409,{error:'请使用“转为订单”创建并关联订单，不能仅修改为已转订单'});
         let item;
         if(matches.length){
           const previous=matches[0],patch={...body,quoteNo:previous.quoteNo,owner:previous.owner,ownerName:previous.ownerName};
@@ -1747,6 +1871,7 @@ async function handleRequest(req, res, url, p, method) {
         return sendJson(res, 200, { ok: true });
       }
       const body = await readBody(req);
+      if(body.status==='已转订单'&&list[idx].status!=='已转订单')return sendJson(res,409,{error:'请使用“转为订单”创建并关联订单，不能仅修改为已转订单'});
       if(body.quoteNo&&quoteNumberKey(body.quoteNo)===quoteNumberKey(list[idx].quoteNo))body.quoteNo=list[idx].quoteNo;
       if(body.quoteNo&&list.some(q=>q.id!==qm[1]&&canAccessRecord(user,q.owner)&&quoteNumberKey(q.quoteNo)===quoteNumberKey(body.quoteNo)&&sameCustomer(q,{...list[idx],...body})))return sendJson(res,409,{error:'该编号已存在，请打开原报价更新内容'});
       try { list[idx] = reviseQuote(list[idx],await enrichQuoteCatalog(body,user,list[idx]),user,Date.now()); }
@@ -2274,10 +2399,15 @@ async function handleRequest(req, res, url, p, method) {
         const budget=Object.fromEntries(years.map(y=>[y,{company:(companyTotals[y]||0)/100,allocated:(assigned[y]||0)/100,remaining:((companyTotals[y]||0)-(assigned[y]||0))/100}]));
         const response={...config,scope:company?'company':'personal',userId:company?null:targetUser,canEdit:company?user.role==='admin':targetUser===user.id&&user.role!=='admin',budget};
         if(company){
+          if (user.role === 'admin') {
+            response.memberTargets = Object.fromEntries(users
+              .filter(member => member.role !== 'admin')
+              .map(member => [member.id, data[member.id]?.yearMonthly || {}]));
+          }
           // Aggregate only: company totals do not reveal other people's customers or orders.
           const monthly={};let undatedCount=0;
           for(const o of await readJson(ORDERS_FILE)){
-            if(['已取消','Cancelled'].includes(o.status))continue;
+            if(!orderWorkflow.isDeal(o))continue;
             let date=String(o.orderDate||'').trim();if(!date&&o.createdAt){const d=new Date(o.createdAt);if(!isNaN(d))date=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
             const d=new Date(date+'T00:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(d)||d.toISOString().slice(0,10)!==date){undatedCount++;continue;}
             const row=monthly[date.slice(0,7)] ||= {count:0,invalidCount:0,amounts:{}};row.count++;
@@ -2818,6 +2948,7 @@ releaseNotice = await createReleaseNotice(__dirname);
 await ensureStore();
 await catalogStore.recover();
 await quoteInquiryStore.recover();
+await quoteOrderStore.recover();
 await quoteVersionStore.recover();
 await inquiryIntakeStore.recover();
 await migrateContacts();
@@ -2845,4 +2976,3 @@ async function gracefulShutdown(sig) {
 }
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-

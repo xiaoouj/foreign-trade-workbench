@@ -17,7 +17,7 @@ function orderHasShipment(orderNo) {
 }
 function unshippedOrders() {
   if (typeof orders === 'undefined') return [];
-  return orders.filter((o) => o.orderNo && !orderHasShipment(o.orderNo));
+  return orders.filter((o) => o.orderNo && !FTWOrderWorkflow.isCancelled(o) && !['已发货','已完成'].includes(o.status) && !orderHasShipment(o.orderNo));
 }
 function renderShipments() {
   const body = document.querySelector('#shipBody');
@@ -102,17 +102,21 @@ function openShipmentModal(id, prefill = {}) {
     const m = id ? 'PUT' : 'POST';
     const r = await api(url, { method: m, body: JSON.stringify(fd) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); toast('保存失败：' + (j.error || r.status)); return; }
-    // 若关联了未发货订单，自动更新订单状态为"已发货"
-    if (fd.orderNo && !orderHasShipment(fd.orderNo)) {
-      const o = (typeof orders !== 'undefined') ? orders.find((x) => x.orderNo === fd.orderNo && !['已发货','已完成'].includes(x.status)) : null;
+    // A shipping plan does not mean the cargo has left. Existing plans can later
+    // become actual shipments; never reopen a completed or cancelled order.
+    let orderSyncFailed = false;
+    if (fd.orderNo && ['已发货','在途','已到港','已签收'].includes(fd.status)) {
+      const o = orders.find(x => x.orderNo === fd.orderNo && !['已发货','已完成'].includes(x.status) && !FTWOrderWorkflow.isCancelled(x));
       if (o) {
-        await api('/api/orders/' + o.id, { method: 'PUT', body: JSON.stringify({ status: '已发货' }) });
-        // 同步本地数据
-        o.status = '已发货';
-        if (typeof renderOrders === 'function') renderOrders();
+        try {
+          const updated = await api('/api/orders/' + o.id, {method:'PUT',body:JSON.stringify({status:'已发货'})});
+          if (!updated.ok) throw new Error('订单状态更新失败');
+          Object.assign(o,await updated.json());
+          renderOrders();
+        } catch { orderSyncFailed = true; }
       }
     }
-    toast('已保存'); closeModal(); loadShipments();
+    toast(orderSyncFailed ? '出货单已保存，订单状态未同步，请核对后重试' : '已保存'); closeModal(); loadShipments();
   };
 }
 // 一键发货：从订单页跳转，预填订单号和客户
@@ -406,11 +410,12 @@ function renderFinance() {
     if (f.type === '应付供应商' && f.status !== '已付') pay += c;
     if (f.type === '应付供应商' && f.status === '已付') paid += c;
   }
-  // 订单自动汇总（与「订单」页待收款同口径）：应收=未收款订单，已收=已收款/已完成订单
-  const AR_STATUS = ['待确认', '已确认', '生产中', '已发货'];
-  const DONE_STATUS = ['已收款', '已完成'];
-  const orderRecv = orders.filter((o) => AR_STATUS.includes(o.status)).reduce((s, o) => s + (finCny(o.amount, o.currency) || 0), 0);
-  const orderCollected = orders.filter((o) => DONE_STATUS.includes(o.status)).reduce((s, o) => s + (finCny(o.amount, o.currency) || 0), 0);
+  // Do not turn an order stage or an agreed deposit into an actual receipt.
+  const orderPayments = orders.filter(o => !FTWOrderWorkflow.isCancelled(o)).map(o => ({...o,payment:FTWOrderWorkflow.payment(o)}));
+  const knownPayments = orderPayments.filter(o => o.payment.known);
+  const unknownPayments = orderPayments.length - knownPayments.length;
+  const orderRecv = knownPayments.reduce((s,o) => s + (finCny(o.payment.outstanding,o.currency)||0),0);
+  const orderCollected = knownPayments.reduce((s,o) => s + (finCny(o.payment.received,o.currency)||0),0);
   recv += orderRecv;
   collected += orderCollected;
   const sumEl = document.querySelector('#finSummary');
@@ -419,7 +424,7 @@ function renderFinance() {
     <div class="stat-card"><div class="stat-num">${fmtMoney(collected)}</div><div class="stat-label">已收</div></div>
     <div class="stat-card"><div class="stat-num">${fmtMoney(pay)}</div><div class="stat-label">应付未付</div></div>
     <div class="stat-card"><div class="stat-num">${fmtMoney(paid)}</div><div class="stat-label">已付</div></div>
-    ${(orderRecv || orderCollected) ? `<div class="fin-auto-note">已自动汇总订单：应收未收 ${fmtMoney(orderRecv)} ／ 已收 ${fmtMoney(orderCollected)}（财务模块未单独录入时以订单为准）</div>` : ''}`;
+    ${(orderRecv || orderCollected) ? `<div class="fin-auto-note">已自动汇总订单：应收未收 ${fmtMoney(orderRecv)} ／ 已收 ${fmtMoney(orderCollected)}（按付款比例，手工记录请勿重复登记同笔款项）</div>` : ''}${unknownPayments ? `<div class="fin-auto-note">${unknownPayments} 笔订单收款资料未登记或金额无效，收款与余额待核对。</div>` : ''}`;
   // 客户维度应收
   const byClient = {};
   for (const f of finances) {
@@ -430,9 +435,9 @@ function renderFinance() {
     }
   }
   // 订单应收并入客户维度
-  for (const o of orders) {
-    if (AR_STATUS.includes(o.status)) {
-      const c = finCny(o.amount, o.currency);
+  for (const o of knownPayments) {
+    if (o.payment.outstanding > 0) {
+      const c = finCny(o.payment.outstanding, o.currency);
       if (c == null) continue;
       byClient[o.clientName || '未指定'] = (byClient[o.clientName || '未指定'] || 0) + c;
     }

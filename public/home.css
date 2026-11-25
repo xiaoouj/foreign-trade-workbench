@@ -1,0 +1,35 @@
+/* Home enhancements use the current blue interface and existing layout. */
+html body #view-dashboard .stat-card[data-metric="warning"] .sc-num{color:#92400e}
+html body #view-dashboard .stat-card[data-metric="positive"] .sc-num{color:#166534}
+html body #view-dashboard .stat-card[data-metric="neutral"] .sc-num{color:#173466}
+html body #view-dashboard .stat-card .sc-num{white-space:normal;overflow-wrap:anywhere;flex-wrap:wrap;font-size:clamp(20px,1.8vw,29px)}
+html body #view-dashboard .stat-card .sc-num>span:first-child{min-width:0;max-width:100%}
+html body #view-dashboard .stat-card:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){
+ html body #view-dashboard .stat-card::before{display:block;content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent,#2563eb0c,transparent);transform:translateX(-100%);transition:transform .5s}
+ html body #view-dashboard .stat-card:hover::before{transform:translateX(100%)}
+}
+.dash-search-key{flex-shrink:0;font:10px inherit;white-space:nowrap;color:var(--ink-soft);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
+.dash-skeleton{display:block;min-height:18px;background:linear-gradient(90deg,#edf1f7 20%,#dce5f2 50%,#edf1f7 80%);background-size:200% 100%;animation:dash-shimmer 1.5s linear infinite;border-radius:5px}
+#dashHint.dash-skeleton{max-width:360px;color:transparent}
+@keyframes dash-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+html body #view-dashboard .dash-loading .sc-num{position:relative;visibility:hidden}
+html body #view-dashboard .dash-loading .sc-num::after{content:"";position:absolute;inset:7px 0;max-width:160px;visibility:visible;border-radius:5px;background:linear-gradient(90deg,#edf1f7 20%,#dce5f2 50%,#edf1f7 80%);background-size:200% 100%;animation:dash-shimmer 1.5s linear infinite}
+.dash-card-state{font-size:10px;color:var(--ink-soft);line-height:1.5;min-height:15px}
+html body #view-dashboard .dash-failed .sc-num{display:none}
+html body #view-dashboard .dash-failed .dash-card-state{color:#92400e;margin-top:12px}
+#view-dashboard :is(.dash-loading,.dash-failed)>:not(.dash-feedback){display:none}
+#view-dashboard .stat-card:is(.dash-loading,.dash-failed)>:not(.dash-feedback){display:revert}
+html body #view-dashboard .stat-card.dash-failed .sc-num{display:none}
+.dash-feedback{padding:24px 20px;min-height:120px;box-sizing:border-box;font-size:12px;color:var(--ink-soft)}
+.dash-feedback .dash-skeleton{margin:0 0 14px;height:18px}.dash-feedback .dash-skeleton:nth-child(2){width:82%}.dash-feedback .dash-skeleton:nth-child(3){width:60%}
+.dash-empty{display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;gap:8px;padding:24px 18px;min-height:160px;box-sizing:border-box;color:var(--ink-soft);font-size:12px}
+.dash-empty-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#eff6ff;color:#2563eb;font-size:26px}
+.dash-empty strong{font-weight:600;color:var(--ink)}.dash-empty p{margin:0;line-height:1.6;max-width:300px}
+.dash-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.ftw-clock-actions{display:flex;gap:8px;align-items:center}html body #worldClocks .ftw-clock-grid[hidden],html body #worldClocks .ftw-clock-note[hidden]{display:none}
+html body #worldClocks[data-collapsed="true"]{align-self:start}html body #worldClocks[data-collapsed="true"] .ftw-clock-toolbar{margin-bottom:0}
+@media(max-width:1024px){html body #view-dashboard>.stat-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:768px){html body #view-dashboard>.stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-search-key{display:none}html body .tb-search{width:160px;flex-basis:160px}}
+@media(max-width:480px){html body .topbar{flex-wrap:wrap}html body .tb-right{display:contents}html body .tb-left{flex:1}html body .tb-search{display:flex;order:2;flex:1 0 100%;width:100%;box-sizing:border-box}.dash-empty{padding:20px 12px}.ftw-clock-actions{gap:5px}html body #worldClocks .ftw-clock-toolbar{gap:8px}}
+@media(prefers-reduced-motion:reduce){.dash-skeleton,html body #view-dashboard .dash-loading .sc-num::after{animation:none}}

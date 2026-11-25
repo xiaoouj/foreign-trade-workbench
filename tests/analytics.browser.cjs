@@ -31,6 +31,43 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
   assert.equal(await page.evaluate(()=>Object.values(salesConfig.yearMonthly).reduce((n,v)=>n+Math.round(v*100),0)),800000000);
   assert.equal((await page.locator('#pfActual').textContent()).replace(/[^0-9]/g,''),'120000');
   assert.match(await page.locator('#pfDeals').textContent(),/Company order/);assert.match(await page.locator('#pfDeals').textContent(),/业务员甲/);assert.match(await page.locator('#pfAlertSummary').textContent(),/大单 1/);assert.match(await page.locator('#pfClientChart').textContent(),/Company order/);
+  const teamRow=page.locator('#pfTeamBody tbody tr').filter({hasText:'业务员甲'});
+  assert.match(await teamRow.textContent(),/¥120,000.*未设置/);
+  assert.equal(await page.locator('#pfMonthlyChart .perf-bar-value').count(),12);
+  assert.equal(await page.locator('#pfMonthlyChart [data-perf-month="2026-01"] .perf-bar-value').textContent(),'12.0万');
+  await page.locator('[data-perf-mode=table]').click();
+  assert.match(await page.locator('#pfMonthlyChart table').textContent(),/¥120,000/);
+  await page.locator('[data-perf-mode=chart]').click();
+  assert.match(await page.locator('#pfClientChart').textContent(),/Company order.*¥120,000/s);
+  await page.locator('#pfStatusWeek').selectOption('2026-01-05');
+  assert.match(await page.locator('#pfStatus .perf-status-list').textContent(),/已完成.*1 笔.*100.0%/s);
+  await page.locator('#pfStatusWeek').selectOption('2026-01-12');
+  assert.match(await page.locator('#pfStatus').textContent(),/暂无/);
+  await page.locator('#pfStatusWeek').selectOption('');
+  const dealPanel=page.locator('#view-performance .analytics-detail').filter({has:page.locator('#pfDeals')});
+  const columnButton=dealPanel.getByRole('button',{name:'列设置',exact:true});
+  const processedTable=page.locator('#pfDeals thead th[data-col=c3]');
+  await processedTable.waitFor();
+  for(const period of ['month','quarter','year','month','year']){
+    await page.locator('[data-period='+period+']').click();
+    await processedTable.waitFor();
+    assert.equal(await columnButton.count(),1,'one column button after switching to '+period);
+  }
+  await columnButton.click();
+  await page.locator('.col-cfg-row[data-col-key=c3] input[type=checkbox]').uncheck();
+  await page.locator('#colSave').click();
+  await processedTable.waitFor({state:'hidden'});
+  await page.locator('#perfDate').fill('2025-01');
+  await page.locator('#perfDate').dispatchEvent('change');
+  await page.waitForFunction(()=>!document.querySelector('#pfDeals').parentElement.querySelector('.col-cfg-btn'));
+  await page.locator('#perfDate').fill('2026-01');
+  await page.locator('#perfDate').dispatchEvent('change');
+  await processedTable.waitFor({state:'attached'});
+  assert.equal(await columnButton.count(),1);
+  assert.equal(await processedTable.isVisible(),false,'saved column settings apply to the rebuilt table');
+  await columnButton.click();
+  await page.locator('#colReset').click();
+  await processedTable.waitFor({state:'visible'});
   await page.locator('#perfOwner').selectOption(fixture.id);await page.waitForFunction(()=>perfTargetReady&&salesConfig.scope==='personal');assert.equal(await page.locator('#perfEditTarget').isVisible(),false);
   const ctx=await browser.newContext({viewport:{width:715,height:769}}),sales=await ctx.newPage();sales.on('pageerror',e=>errors.push(e.message));
   await sales.goto('http://127.0.0.1:4193/#/performance');await sales.locator('#loginUser').fill('target-sales');await sales.locator('#loginPwd').fill(password);await sales.locator('#loginForm button[type=submit]').click();await sales.waitForFunction(()=>typeof perfTargetReady!=='undefined'&&perfTargetReady);
@@ -42,7 +79,31 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
   await sales.waitForTimeout(350);await sales.locator('#perfOwner').selectOption('company');await sales.waitForFunction(()=>perfTargetReady&&salesConfig.scope==='company');assert.equal(await sales.locator('#perfEditTarget').isVisible(),false);assert.equal((await sales.locator('#pfTarget').textContent()).replace(/[^0-9]/g,''),'800000000');assert.equal((await sales.locator('#pfActual').textContent()).replace(/[^0-9]/g,''),'120000');
   await sales.screenshot({path:'/tmp/targets-company-mobile.png'});assert.equal(await sales.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await sales.locator('#perfOwner').selectOption(fixture.id);await sales.waitForFunction(()=>perfTargetReady&&salesConfig.scope==='personal');await sales.locator('#perfEditTarget').click();await sales.locator('#modalForm input[name=total]').fill('9000000');await sales.locator('#modalFoot button[type=submit]').click();await sales.waitForTimeout(300);assert.equal(await sales.locator('#modalForm input[name=total]').inputValue(),'9000000');assert.equal(await sales.evaluate(()=>Object.values(salesConfig.yearMonthly).reduce((n,v)=>n+Math.round(v*100),0)),100000000);
+  assert.equal(await sales.locator('#pfTeam').isVisible(),false);
+  await page.locator('#perfOwner').selectOption('company');
+  await page.waitForFunction(()=>perfTargetReady&&salesConfig.scope==='company');
+  assert.match(await teamRow.textContent(),/¥120,000.*¥83,333.*144.0%/s);
+  await page.evaluate(async password=>{
+    const member=await api('/api/users',{method:'POST',body:JSON.stringify({username:'overview-sales',name:'业务员乙',password,role:'sales'})});
+    if(!member.ok)throw Error('Second sales fixture was not created');
+    const {id}=await member.json();
+    const order=await api('/api/orders',{method:'POST',body:JSON.stringify({orderNo:'TEST-2',clientName:'A longer industrial customer name',owner:id,amount:10000,currency:'CNY',orderDate:'2026-01-20',status:'生产中'})});
+    if(!order.ok)throw Error('Second order fixture was not created');
+    await loadUsers();await loadAll();await loadPerfSales();
+  },password);
+  const teamRows=page.locator('#pfTeamBody tbody tr');
+  assert.equal(await teamRows.count(),2);
+  assert.match(await teamRows.first().textContent(),/业务员甲.*¥120,000/);
+  assert.match(await teamRows.last().textContent(),/业务员乙.*¥10,000.*未设置/);
+  assert.match(await page.locator('#pfStatus .perf-status-list').textContent(),/生产中.*1 笔.*50.0%/s);
+  for(const width of [689,390]){
+    await page.setViewportSize({width,height:791});
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    assert.equal(await page.locator('#view-performance .stats-4').evaluate(grid=>getComputedStyle(grid).gridTemplateColumns.split(' ').length),2);
+    await page.screenshot({path:'../performance-'+width+'.png',fullPage:true});
+  }
   await ctx.close();
-  assert.deepEqual(errors,[]);console.log('PASS company vs self scopes, admin read-only members, annual split, company actual, cap rejection, mobile');
+  assert.deepEqual(errors,[]);console.log('PASS company vs self scopes, admin read-only members, annual split, company actual, cap rejection, member comparison, weekly status, visible bar amounts, mobile and single column button');
  }finally{if(browser)await browser.close();if(server.exitCode===null){server.kill('SIGTERM');await once(server,'exit');}await fs.rm(data,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});

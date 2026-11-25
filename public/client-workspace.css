@@ -1,0 +1,70 @@
+/* Scoped to the customer workspace; shared dashboard classes are untouched. */
+#view-clients .client-summary-card{font:inherit;text-align:left;cursor:pointer;min-width:0;transition:border-color .15s,background .15s}
+#view-clients .client-summary-card:hover,#view-clients .client-summary-card[aria-pressed="true"]{border-color:#93b8fc;background:#f4f8ff}
+#view-clients .client-secondary-filters{display:flex;gap:12px;flex-wrap:wrap;padding:12px 0 16px}
+#view-clients .client-secondary-filters label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--ink-soft);flex:1;min-width:140px;max-width:220px}
+#view-clients .client-secondary-filters :is(input,select,.ftw-combo){min-width:0;width:100%;box-sizing:border-box}
+#view-clients .client-advanced{border-bottom:1px solid var(--line);border-radius:0 0 8px 8px}
+#view-clients #clientFilterToggle{display:none}
+#view-clients #clientFilterChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+#view-clients #clientFilterChips:empty{display:none}
+#view-clients #clientFilterChips button{font:inherit;font-size:11px;border:1px solid #cbdcf6;background:#eff6ff;color:#244e89;border-radius:5px;padding:5px 8px;max-width:100%;overflow-wrap:anywhere;text-align:left;cursor:pointer}
+#view-clients .client-list-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:16px 0 12px;font-size:12px;color:var(--ink-soft)}
+#view-clients .client-view-toggle{display:flex;border:1px solid var(--line);background:white;border-radius:6px;overflow:hidden;flex-shrink:0}
+#view-clients .client-view-toggle button{font:inherit;font-size:12px;border:0;background:transparent;padding:7px 13px;color:var(--ink-soft);cursor:pointer;border-radius:0}
+#view-clients .client-view-toggle button[aria-pressed="true"]{background:#eaf2ff;color:#1d4ed8;font-weight:600}
+html body #view-clients .cl-table td{padding:13px 12px}
+html body #view-clients .cl-table tbody tr:nth-child(even) td{background:#fafbfd}
+html body #view-clients .cl-table tbody tr:hover td{background:#f0f6ff}
+html body #view-clients .cl-table tbody tr.sel td{background:#e4efff}
+html body #view-clients .cl-table tbody tr.sel td:first-child{box-shadow:inset 3px 0 #2563eb}
+#view-clients .client-name-contact{display:block;color:#64748b;font-size:11px;margin-top:4px;font-weight:400}
+#view-clients .cl-table:has(th[data-col="contact"]:not(.col-hidden)) .client-name-contact{display:none}
+#view-clients .client-follow{display:inline-flex;flex-direction:column;gap:3px;line-height:1.4;font-size:11px;white-space:nowrap}
+#view-clients .client-follow small{font-size:10px;font-weight:600}
+#view-clients .client-follow.overdue{color:#b91c1c}#view-clients .client-follow.today{color:#92400e}#view-clients .client-follow.scheduled{color:#166534}#view-clients .client-follow.missing{color:#64748b}
+#view-clients .tag-s{background:#f0eaff;color:#5b21b6}#view-clients .tag-a{background:#fef3c7;color:#78350f}#view-clients .tag-b{background:#dbeafe;color:#1e40af}#view-clients .tag-c{background:#f1f5f9;color:#475569}#view-clients .tag-d{background:#f3f4f6;color:#4b5563}
+html body #view-clients .cl-star{border:0;background:transparent;padding:2px;line-height:1.3;cursor:pointer;font:inherit;font-size:20px;color:#64748b;flex-shrink:0}html body #view-clients .cl-star.on{color:#a16207}
+#view-clients .client-cards{display:none}
+#view-clients[data-client-view="cards"] .client-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px}
+html body #view-clients[data-client-view="cards"] .cl-panel{display:none}
+#view-clients .client-card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:16px;min-width:0}
+#view-clients .client-card.sel{border-color:#7da9f3;background:#f4f8ff;box-shadow:inset 3px 0 #2563eb}
+#view-clients .client-card header{display:flex;align-items:flex-start;gap:9px}
+#view-clients .client-card-name{font:inherit;font-size:14px;font-weight:650;line-height:1.5;flex:1;min-width:0;border:0;background:none;padding:0;text-align:left;color:#1e40af;cursor:pointer;overflow-wrap:anywhere}
+#view-clients .client-card-select{display:flex;align-items:center;padding-top:3px}
+#view-clients :is(.client-card-check,#clientSelectPage){width:16px;height:16px;min-height:16px;margin:0;accent-color:#2563eb}
+#view-clients .client-card-contact{margin:5px 0 12px 25px;font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere}
+#view-clients .client-card-meta{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:11px;color:#52647e}
+#view-clients .client-card dl{display:grid;gap:11px;margin:16px 0}
+#view-clients .client-card dl>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+#view-clients .client-card dt{font-size:11px;color:#64748b;flex-shrink:0}#view-clients .client-card dd{margin:0;min-width:0;text-align:right;font-size:12px;color:#344b6b;overflow-wrap:anywhere}
+#view-clients .client-card footer{display:flex;gap:7px;flex-wrap:wrap;border-top:1px solid #edf1f7;padding-top:12px}
+#view-clients :is(.client-card footer button,.client-card-inquiries,.client-page-buttons button,.client-empty button,#clientDataState button){font:inherit;font-size:12px;border:1px solid #cbdcf6;background:#fff;color:#1d4ed8;padding:7px 10px;border-radius:5px;cursor:pointer}
+#view-clients .client-card-inquiries{border:0;padding:0;background:none}
+#view-clients .client-page-footer{display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:11px;color:var(--ink-soft);padding:14px 2px}
+#view-clients .client-page-footer label{display:flex;align-items:center;gap:7px}
+#view-clients .client-page-footer select{width:auto;min-width:70px;font:inherit;padding:6px}
+#view-clients .client-page-buttons{display:flex;gap:6px;margin-left:auto}
+#view-clients .client-page-buttons button:disabled{opacity:.45;cursor:default}
+#view-clients #clientBatchBar{position:sticky;top:74px;z-index:6;border:1px solid #b9d2fa;background:#f0f6ff;border-radius:7px;padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}
+#view-clients #clientBatchBar.hidden{display:none}
+#view-clients .client-empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:36px 16px;min-height:160px;justify-content:center;color:#475569;font-size:12px}
+#view-clients .client-empty p{margin:0;line-height:1.7}
+#view-clients #clientDataState{padding:24px;background:white;border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--ink-soft)}
+#view-clients #clientDataState[hidden]{display:none}
+html body #view-clients:is([data-client-state="pending"],[data-client-state="error"]) :is(.cl-panel,.client-cards,.client-page-footer){display:none}
+#view-clients .client-loading-line{display:block;height:18px;margin:12px 0;border-radius:5px;background:linear-gradient(90deg,#edf1f7,#dce5f2,#edf1f7);background-size:200% 100%;animation:client-shimmer 1.5s linear infinite}
+#view-clients .client-loading-line:nth-child(2){width:80%}#view-clients .client-loading-line:nth-child(3){width:60%}
+@keyframes client-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+#view-clients .client-accessible{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:1024px){#view-clients .client-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:768px){
+ #view-clients #clientFilterToggle{display:block;width:100%;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;background:white;color:#244e89;text-align:left;cursor:pointer}
+ #view-clients:not(.client-filters-open) #clientFilterPanel{display:none}
+ html body #view-clients .client-filters{border-top:1px solid var(--line);border-radius:6px 6px 0 0;margin-top:8px;padding-top:12px}
+ #view-clients .client-secondary-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}#view-clients .client-secondary-filters label{min-width:0;max-width:none}
+ #view-clients .client-scope-tabs{gap:20px;padding:0 12px}#view-clients .client-summary{gap:8px;margin-bottom:16px}#view-clients .client-summary-card{padding:13px 10px;gap:8px}#view-clients .summary-symbol{width:28px;height:28px;font-size:20px}#view-clients .client-summary-card>div>span{font-size:10px}#view-clients .client-summary-card strong{font-size:23px}
+ #view-clients .client-page-footer{gap:10px}#view-clients .client-select-page{order:-1;width:100%}#view-clients #clientBatchBar{top:112px}
+}
+@media(prefers-reduced-motion:reduce){#view-clients .client-loading-line{animation:none}}

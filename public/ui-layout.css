@@ -41,7 +41,7 @@ html body #modalForm table{max-width:100%}
 html body #modalForm .ftw-modal-table-scroll{min-width:0;max-width:100%;overflow-x:auto;grid-column:1/-1}
 body.ftw-modal-open{overflow:hidden}
 @media(min-width:1600px){html body #view-dashboard>.stat-row{grid-template-columns:repeat(6,minmax(0,1fr))}}
-@media(max-width:900px){
+@media(max-width:820px){
 html body .app>.sidebar{position:fixed;left:0;top:0;bottom:0;right:auto;height:100dvh;width:min(290px,86vw)!important;flex-basis:auto;z-index:40;visibility:visible;transform:translateX(0);transition:transform .18s;overflow:hidden}
 html body .app.nav-collapsed>.sidebar{width:min(290px,86vw)!important;transform:translateX(-100%);visibility:hidden}
 html body .sidebar .brand{display:flex;flex-shrink:0}

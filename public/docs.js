@@ -448,7 +448,7 @@ function renderPreview() {
   $('#d_preview').innerHTML = `<style>${DOC_CSS}</style>` + buildInner(collectDoc());
 }
 function printDoc() {
-  if (!val('d_docNo').trim()) {toast('请先填写单号');$('#d_docNo').focus();return;} 
+  if (!val('d_docNo').trim()) {toast('请先填写单号');$('#d_docNo').focus();return;}
   const d = collectDoc();
   const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(d.docNo)}</title><style>${DOC_CSS}</style></head><body>${buildInner(d)}</body></html>`;
   const w = window.open('', '_blank');

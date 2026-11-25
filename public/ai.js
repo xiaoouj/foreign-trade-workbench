@@ -402,7 +402,7 @@ const ORDER_SCHEMA_FIELDS = [
   'orderNo', 'clientName', 'country', 'amount', 'currency', 'status',
   'orderDate', 'deliveryDate', 'paymentTerms', 'notes', 'items',
 ];
-const ORDER_STATUS_SET = ['待确认', '已确认', '生产中', '已发货', '已收款', '已完成', '已取消'];
+const ORDER_STATUS_SET = FTWOrderWorkflow.statuses;
 const ORDER_CURRENCY_SET = ['USD', 'CNY', 'EUR', 'GBP', 'RUB', 'JPY', 'HKD', 'AUD', 'CAD'];
 
 let aiOrderSession=null, aiOrderOpenVersion=0;
@@ -879,7 +879,7 @@ function openAiDeconstruct() {
   openModal('🤖 AI 解构 · 聊天记录自动入系统', `
     <div class="field full">
       <label>粘贴沟通内容（WhatsApp / 微信 / 邮件 / 电话均可，一整段）</label>
-      <textarea id="decRaw" rows="9" placeholder="例：\nAli: Hi, we want to buy a chain conveyor 10m.\n我: Sure, FOB Foshan USD6200, motor and bracket included.\nAli: OK we will check with our tech team."></textarea>
+      <textarea id="decRaw" rows="9" placeholder="例：\nAli: Hi, we want to buy a chain conveyor 10m.\n我: Sure, FOB Shanghai USD6200, motor and bracket included.\nAli: OK we will check with our tech team."></textarea>
     </div>
     <div class="field"><label>沟通通道（用于归档）</label>
       <select id="decChannel"><option>微信</option><option>WhatsApp</option><option>电话</option><option>邮件</option><option selected>其他</option></select>

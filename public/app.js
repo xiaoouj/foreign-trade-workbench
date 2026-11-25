@@ -46,7 +46,7 @@ const api = (path, opts = {}) => {
   // credentials: same-origin 确保同源请求始终携带 cookie；Bearer 头作为刷新不丢失的兜底
   return fetch(path, { ...opts, headers, credentials: 'same-origin', signal: ctrl.signal }).then((res) => {
     clearTimeout(timer);
-    if (res.status === 401 && !String(path).includes('/api/login')) {
+    if (res.status === 401 && token === localStorage.getItem('ftw_token') && !String(path).includes('/api/login')) {
       localStorage.removeItem('ftw_token');
       if (typeof window.showLogin === 'function') window.showLogin('登录已过期，请重新登录');
     }
@@ -96,7 +96,7 @@ const GRADES = ['S', 'A', 'B', 'C', 'D'];
 // 旧版阶段名 → 等级映射（数据自动迁移，不再显示中文阶段名）
 const _OLD_STAGES = new Map(['潜在','跟进中','报价','样品','成交','流失'].map((s, i) => [s, 'C']));
 function gradeOf(raw) { return (raw && _OLD_STAGES.has(raw)) ? _OLD_STAGES.get(raw) : (raw || '-'); }
-const STATUSES = ['待确认', '已确认', '生产中', '已发货', '已收款', '已完成', '已取消'];
+const STATUSES = FTWOrderWorkflow.statuses;
 const CURRENCIES = ['USD', 'EUR', 'CNY', 'GBP', 'JPY', 'AUD', 'CAD', 'HKD', 'SGD', 'INR'];
 // 商机阶段（独立于订单状态）：用于加权预测
 const OPPTY_STAGES = ['初步接触', '需求确认', '方案报价', '商务谈判', '赢单', '输单'];
@@ -143,7 +143,42 @@ function refreshDashboardOnEnter() {
     .catch((e) => console.error('仪表盘自动刷新失败', e));
 }
 
-function activateView(view) {
+// Native loaders redraw their own views. Share an in-flight navigation refresh
+// when a user revisits the same destination before its response arrives.
+const navigationLoads = new Map();
+async function refreshBusinessView(view) {
+  if (!currentUser) return;
+  const actor = currentUser.id;
+  const routes = {
+    clients: [loadAll, window.refreshInquiries], orders: [loadAll],
+    quotations: [loadAll], enquiry: [loadAll, window.refreshInquiries],
+    performance: [loadAll, window.refreshInquiries], inqstats: [loadAll, window.refreshInquiries],
+    reports: [loadAll, window.refreshInquiries], suppliers: [window.loadSuppliers],
+    shipments: [loadAll, window.loadShipments], finance: [loadAll, window.loadFinance],
+    'order-detail': [loadAll, window.loadShipments], 'client-detail': [loadAll, window.refreshInquiries]
+  };
+  const loaders = routes[view];
+  if (!loaders) return;
+  try {
+    await Promise.all(loaders.filter(Boolean).map(loader => {
+      const key = String(actor) + ':' + (loader === loadAll ? 'core' : loader === window.refreshInquiries ? 'inquiries' : view);
+      if (!navigationLoads.has(key)) {
+        navigationLoads.set(key, Promise.resolve().then(loader).finally(() => navigationLoads.delete(key)));
+      }
+      return navigationLoads.get(key);
+    }));
+    if (actor !== currentUser?.id || !document.getElementById('view-' + view)?.classList.contains('active')) return;
+    if (view === 'shipments') renderShipments();
+    if (view === 'finance') renderFinance();
+    if (view === 'order-detail') renderSalesOrder();
+    if (view === 'client-detail') renderClientDetail();
+  } catch (error) {
+    console.error('切换页面刷新失败', view, error);
+    if (actor === currentUser?.id && document.getElementById('view-' + view)?.classList.contains('active')) toast('数据刷新失败，请重新点击当前菜单');
+  }
+}
+
+function activateView(view, initial = false) {
   if(view.startsWith('order-detail?')){window.salesSelectedOrder=new URLSearchParams(view.split('?')[1]).get('id');view='order-detail';}
   if (HIDDEN_STANDALONE_VIEWS.has(view.split('?')[0])) {
     history.replaceState(null, '', '#/dashboard');
@@ -171,6 +206,7 @@ function activateView(view) {
   if (view === 'client-detail') renderClientDetail();
   if (view === 'order-detail' && typeof renderSalesOrder==='function') renderSalesOrder();
   if (view === 'dashboard') refreshDashboardOnEnter();
+  else if (!initial) refreshBusinessView(view);
   // 客户列表：视图刚显示出来才量得到容器宽度，这里再适配一次列宽
   // （首帧渲染时该 section 还是 display:none，clientWidth=0，适配会失效）
   if (view === 'clients' && typeof clApplyWidths === 'function') {
@@ -293,7 +329,7 @@ function bindDashboardActions() {
     });
   });
   const q = (id) => $('#' + id);
-  if (q('qaQuote')) q('qaQuote').onclick = () => quickDoc('quotation');
+  if (q('qaQuote')) q('qaQuote').onclick = () => openQuoteModal();
   if (q('qaClient')) q('qaClient').onclick = () => openClientModal();
   if (q('qaPI')) q('qaPI').onclick = () => quickDoc('pi');
   if (q('qaPL')) q('qaPL').onclick = () => quickDoc('packing');
@@ -352,15 +388,49 @@ function renderWorldClocks() {
   wrap.classList.add('ftw-clock-panel');
   // Only rebuild when preferences change; ticking must not remove keyboard focus.
   const signature=JSON.stringify(ftwClockPrefs);
-  if(wrap.dataset.clockSignature===signature)return;
+  if(wrap.dataset.clockSignature===signature && wrap.dataset.clockUser===ftwClockUserKey)return;
+  wrap.dataset.clockUser=ftwClockUserKey;
   wrap.dataset.clockSignature=signature;
-  wrap.innerHTML=`<div class="ftw-clock-toolbar"><b>客户当地时间 <span id="ftwClockSummary"></span></b><button type="button" class="btn-ghost" id="ftwClockSettings">设置展示国家</button></div><div class="ftw-clock-grid">${ftwClockPrefs.map(p=>{const z=FTW_MARKET_ZONES.find(z=>z.tz===p.tz);return `<div class="ftw-clock-item" data-clock-zone="${esc(p.tz)}"><div class="ftw-clock-city">${esc(z.country)} · ${esc(z.city)}</div><time>--:--:--</time><div class="ftw-clock-meta"></div><div class="ftw-clock-state"></div><div class="ftw-clock-meta">${p.start}–${p.end}${p.end<p.start?' 次日':''}</div></div>`}).join('')||'<div class="muted">尚未选择国家，请点击“设置展示国家”。</div>'}</div><p class="ftw-clock-note">按设置的当地工作日与时段判断，不含节假日；不代表客户在线。设置按账号保存在当前浏览器。</p>`;
+  wrap.innerHTML = `<div class="db-clock-summary"><div><div class="db-clock-label">客户此刻在办公时间</div><div class="db-clock-count"><strong id="flowClockCount">0</strong><small>个时区</small></div></div><div class="db-clock-local">佛山 <b id="flowLocalTime">--:--</b><div class="ftw-clock-actions"><button type="button" id="ftwClockSettings">设置展示国家</button><button type="button" id="ftwClockToggle" aria-controls="ftwClockGrid ftwClockNote">收起</button></div></div></div><div class="db-clock-board"><span id="ftwClockSummary" class="db-visually-hidden"></span><div class="ftw-clock-grid" id="ftwClockGrid">${ftwClockPrefs.map(p => {const zone=FTW_MARKET_ZONES.find(z=>z.tz===p.tz);return `<div class="ftw-clock-item" data-clock-zone="${esc(p.tz)}"><div class="db-clock-heading"><div class="ftw-clock-city">${esc(zone.city)}</div><div class="ftw-clock-state"></div></div><time>--:--</time><div class="ftw-clock-meta db-visually-hidden"></div><div class="db-clock-day" aria-hidden="true"><i class="db-clock-now"></i></div><div class="db-clock-who">${esc(zone.country)} · ${p.start}–${p.end}</div></div>`;}).join('') || '<div class="empty">点击设置展示国家，添加客户时区。</div>'}</div><p class="ftw-clock-note db-visually-hidden" id="ftwClockNote">按当地工作日与设定时段判断，节假日需另行确认。</p></div>`;
   $('#ftwClockSettings').onclick=ftwConfigureClocks;
+  const toggle=$('#ftwClockToggle');
+  const setCollapsed=collapsed=>{wrap.dataset.collapsed=String(collapsed);$('#ftwClockGrid').hidden=collapsed;$('#ftwClockNote').hidden=collapsed;toggle.textContent=collapsed?'展开':'收起';toggle.setAttribute('aria-expanded',String(!collapsed));};
+  let collapsed=false;try{collapsed=localStorage.getItem(ftwClockKey()+'.collapsed')==='true';}catch{}
+  setCollapsed(collapsed);toggle.onclick=()=>{const next=wrap.dataset.collapsed!=='true';setCollapsed(next);try{localStorage.setItem(ftwClockKey()+'.collapsed',String(next));}catch{}};
 }
 function tickTimezones() {
   renderWorldClocks();const now=new Date();let active=0;
-  ftwClockPrefs.forEach(p=>{const state=ftwClockState(p,now);if(state.working)active++;const el=document.querySelector('[data-clock-zone="'+p.tz+'"]');if(!el)return;el.dataset.working=state.working?'yes':'no';el.querySelector('time').textContent=state.time;el.querySelector('.ftw-clock-meta').textContent=state.date+' · '+state.offset;el.querySelector('.ftw-clock-state').textContent=(state.working?'● ':'○ ')+state.status;});
-  const count=$('#ftwClockSummary');if(count)count.textContent=' · '+active+'/'+ftwClockPrefs.length+' 工作中';
+  ftwClockPrefs.forEach(p=>{
+    const state=ftwClockState(p,now);if(state.working)active++;
+    const el=document.querySelector('[data-clock-zone="'+p.tz+'"]');if(!el)return;
+    const minutes=value=>Number(value.slice(0,2))*60+Number(value.slice(3,5));
+    const remaining=(minutes(p.end)-minutes(state.time)+1440)%1440,soon=state.working&&remaining<=60;
+    el.dataset.working=state.working?'yes':'no';el.dataset.soon=soon?'yes':'no';
+    const localDate=new Intl.DateTimeFormat('en-CA',{timeZone:p.tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+    const chinaDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+    const offset=localDate<chinaDate?'昨天':localDate>chinaDate?'明天':'';
+    el.querySelector('time').innerHTML=esc(state.time.slice(0,5))+(offset?'<small class="db-clock-day-offset">'+offset+'</small>':'');
+    el.querySelector('time').setAttribute('datetime',state.time);
+    el.querySelector('.ftw-clock-meta').textContent=state.date+' · '+state.offset;
+    el.title=state.date+' · '+state.offset+' · '+state.status;
+    el.querySelector('.ftw-clock-state').textContent=soon?'快下班':state.working?'办公中':state.status==='休息日'?'休息日':'非办公';
+  });
+  const count=$('#ftwClockSummary');if(count)count.textContent=active+'/'+ftwClockPrefs.length+' 工作中';
+  if ($('#flowClockCount')) $('#flowClockCount').textContent=active;
+  if ($('#flowLocalTime')) $('#flowLocalTime').textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);
+  ftwClockPrefs.forEach(preference => {
+    const host=document.querySelector('[data-clock-zone="'+preference.tz+'"] .db-clock-day');
+    if (!host) return;
+    const state=ftwClockState(preference,now), minutes=value=>Number(value.slice(0,2))*60+Number(value.slice(3,5));
+    const start=minutes(preference.start),end=minutes(preference.end);
+    const segments=end<start?[[start,1440],[0,end]]:[[start,end]];
+    if (!host.dataset.schedule || host.dataset.schedule!==preference.start+preference.end) {
+      host.querySelectorAll('.db-clock-working').forEach(element=>element.remove());
+      segments.forEach(([from,to])=>{const element=document.createElement('span');element.className='db-clock-working';element.style.left=from/14.4+'%';element.style.width=(to-from)/14.4+'%';host.append(element);});
+      host.dataset.schedule=preference.start+preference.end;
+    }
+    host.querySelector('.db-clock-now').style.left=minutes(state.time)/14.4+'%';
+  });
 }
 function ftwConfigureClocks() {
   ftwLoadClocks();
@@ -380,6 +450,7 @@ async function loadRates(manual) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || '汇率获取失败');
     rateData = j;
+    const errorHost=$('#dashboardRateError');if(errorHost)errorHost.hidden=true;
     window.dispatchEvent(new Event('ftw:ratesReady'));
     renderRates();
     $('#connDot').className = 'dot ok';
@@ -388,6 +459,7 @@ async function loadRates(manual) {
   } catch (e) {
     $('#connDot').className = 'dot bad';
     $('#rateSource').textContent = '汇率源: 不可用';
+    const errorHost=$('#dashboardRateError');if(errorHost){errorHost.textContent=rateData?'更新失败，已保留上次汇率。':'汇率暂不可用，请点击刷新重试。';errorHost.hidden=false;}
     if (manual) toast('汇率获取失败: ' + e.message);
   }
 }
@@ -445,6 +517,7 @@ function calcFx() {
 
 // 折算人民币：amount(币种cur) -> CNY，使用 USD 基准 rates
 function toCNY(amount, cur) {
+  if (cur === 'CNY' && amount != null) return Number(amount);
   if (!rateData || amount == null) return null;
   const r = rateData.rates;
   const rCny = r['CNY'], rCur = r[cur];
@@ -471,15 +544,24 @@ function userOrders() {
 }
 
 async function loadAll() {
-  // 同一时间只允许一次全量加载：并发调用复用同一个请求，避免进首页/切页面时重复拉数据
-  if (window.__loadAllP) return window.__loadAllP;
-  window.__loadAllP = _loadAll().finally(() => { window.__loadAllP = null; });
-  return window.__loadAllP;
+  const actor=currentUser?.id;
+  if(window.__loadAllP&&window.__loadAllActor===actor)return window.__loadAllP;
+  window.__loadAllActor=actor;
+  window.crmSalesFeedback?.('orders','pending');
+  const pending=ftwDashLoad('core',()=>_loadAll(actor)).then(value=>{if(actor===currentUser?.id)window.crmSalesFeedback?.('orders','ready');return value;},error=>{if(actor===currentUser?.id)window.crmSalesFeedback?.('orders','error');throw error;}).finally(()=>{if(window.__loadAllP===pending)window.__loadAllP=null;});
+  window.__loadAllP=pending;return pending;
 }
-async function _loadAll() {
-  const [c, o] = await Promise.all([api('/api/clients').then((r) => r.json()), api('/api/orders').then((r) => r.json())]);
-  clients = c; orders = o;
-  backfillClientCreated(); initClientFilters();
+async function _loadAll(actor=currentUser?.id) {
+  const [c, o] = await Promise.all(['/api/clients', '/api/orders'].map(async path => {
+    const response = await api(path);
+    if (!response.ok) throw new Error('工作台数据加载失败');
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error('工作台数据格式异常');
+    return data;
+  }));
+  if(actor!==currentUser?.id)return;
+  clients = c; orders = o;window.__crmCoreDataOwner=actor;
+  if(!window.crmClientRender)backfillClientCreated(); initClientFilters();
   renderClients(); renderOrders(); renderDashboard();
   // 客户速览抽屉开着时同步重渲染，避免编辑保存后抽屉里是旧数据（v20260902d）
   try {
@@ -569,25 +651,12 @@ function renderDashboard() {
   renderRevenueTrend();
   // ===== 新版 5 块（插入到旧功能区之后，不覆盖旧功能） =====
   insertNewDash(v);
+  ftwDashFeedback();
 }
 
 // ================= 仪表盘 KPI 卡片（独立刷新：数据/询盘/报价异步就绪后自动重算） =================
-// 订单归属月份：优先 orderDate；缺失时回退 deliveryDate / createdAt / updatedAt（与「业绩进度」同口径）
-function orderMonthKey(o) {
-  const tryStr = (v) => { const s = String(v == null ? '' : v).slice(0, 7); return /^\d{4}-\d{2}$/.test(s) ? s : ''; };
-  for (const f of ['orderDate', 'deliveryDate', 'createdAt', 'updatedAt']) {
-    const v = o[f];
-    if (v == null || v === '') continue;
-    if (typeof v === 'number') {
-      const d = new Date(v);
-      if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    } else {
-      const s = tryStr(v);
-      if (s) return s;
-    }
-  }
-  return '';
-}
+// 与订单列表和业绩使用同一下单日期（缺失时回退创建日期）。
+function orderMonthKey(o) { return orderDateValue(o).slice(0,7); }
 // 成交询盘归属月份：优先 wonAt，回退 receivedAt / updatedAt / createdAt
 function inqMonthKey(q) {
   const v = q.wonAt || q.receivedAt || q.updatedAt || q.createdAt;
@@ -610,6 +679,9 @@ function renderDashKpis() {
     return canSeeBusiness(iq.owner);
   });
   const statFollow = $('#statFollow'); if (statFollow) statFollow.textContent = pending.length;
+  if (statFollow) statFollow.closest('.stat-card').classList.toggle('db-attention',pending.length>0);
+  const followFlag=$('#followKpiFlag');if(followFlag)followFlag.hidden=!pending.length;
+  const navigation=$('.sidebar [data-view="enquiry"]');if(navigation){let badge=navigation.querySelector('.db-nav-badge');if(!badge){badge=document.createElement('span');badge.className='db-nav-badge';navigation.append(badge);}badge.textContent=pending.length;badge.hidden=!pending.length;}
   // 当月报价：与「报价管理」页同源（报价单记录，按创建月份），保证两处数字一致
   const qts = (typeof window.getAllQuotations === 'function') ? window.getAllQuotations() : [];
   const monthQuotes = qts.filter((q) => {
@@ -619,10 +691,15 @@ function renderDashKpis() {
   const statQuotes = $('#statQuotes'); if (statQuotes) statQuotes.textContent = monthQuotes.length;
   // 客户数量
   const statClients = $('#statClients'); if (statClients) statClients.textContent = clients.length;
+  const recentCutoff=Date.now()-30*86400000;
+  const newClients=clients.filter(client=>{const created=new Date(client.createdAt).getTime();return Number.isFinite(created)&&created>=recentCutoff&&created<=Date.now();}).length;
+  if ($('#statClientsNote')) $('#statClientsNote').textContent='近 30 天新增 '+newClients;
   // 今日任务
   const tasks = typeof window.getAllTasks === 'function' ? window.getAllTasks() : [];
   const todayTasks = tasks.filter((t) => !['已完成', '已取消'].includes(t.status) && t.dueDate && t.dueDate <= today);
   const statTasksToday = $('#statTasksToday'); if (statTasksToday) statTasksToday.textContent = todayTasks.length;
+  const overdueTasks=todayTasks.filter(task=>task.dueDate<today).length;
+  if ($('#statTasksNote')) $('#statTasksNote').textContent=overdueTasks?'已逾期 '+overdueTasks+' 项':todayTasks.length?'今日到期 '+todayTasks.length+' 项':'暂无到期任务';
   // 进行中商机 + 加权管道：以「询盘商机」为准（与询盘漏斗/询盘分析同口径），按阶段概率加权
   const OPEN_STAGES = ['新询盘', '已报价', '等回复', '谈判中'];
   const STAGE_PROB = { '新询盘': 10, '已报价': 30, '等回复': 50, '谈判中': 70 };
@@ -631,13 +708,10 @@ function renderDashKpis() {
   for (const q of openOpp) weighted += (toCNY(Number(q.expectedAmount) || 0, q.currency) || 0) * (STAGE_PROB[q.status] || 0) / 100;
   const wEl = $('#statWeighted'); if (wEl) wEl.textContent = (typeof fmtMoney === 'function') ? fmtMoney(weighted) : Math.round(weighted).toLocaleString();
   const oEl = $('#statOpenOpp'); if (oEl) oEl.textContent = openOpp.length;
-  // 本月成交：订单（日期回退、非取消）+ 成交询盘，与「业绩进度」同口径
+  // 本月成交：生产中及后续订单全额；询盘不重复计入，与业绩进度同口径。
   let monthRevenue = orders
-    .filter((o) => o.status !== '已取消' && orderMonthKey(o) === month)
+    .filter((o) => FTWOrderWorkflow.isDeal(o) && orderMonthKey(o) === month)
     .reduce((s, o) => s + (toCNY(Number(o.amount) || 0, o.currency) || 0), 0);
-  monthRevenue += inqs
-    .filter((q) => (q.status || '') === '成交' && inqMonthKey(q) === month)
-    .reduce((s, q) => s + (toCNY(Number(q.expectedAmount) || 0, q.currency) || 0), 0);
   const mrEl = $('#statMonthRevenue'); if (mrEl) mrEl.textContent = (typeof fmtMoney === 'function') ? fmtMoney(monthRevenue) : Math.round(monthRevenue).toLocaleString();
 }
 // 数据 / 询盘 / 报价加载完成后，仅刷新 KPI 卡片（不整页重渲染）
@@ -649,17 +723,16 @@ window.addEventListener('ftw:inquiriesChanged', () => {
   try { renderClients(); } catch (e) { /* 客户视图不在当前页时静默 */ }
 });
 window.addEventListener('ftw:quotationsChanged', () => { try { renderDashKpis(); } catch (e) { console.error('dashKpis', e); } });
-window.addEventListener('ftw:ratesReady', () => { if (window.fillDashboardRates) window.fillDashboardRates(); try { renderDashKpis(); } catch (e) { console.error('dashKpis', e); } try { renderOrders(); } catch (e) { console.error('orders', e); } });
+window.addEventListener('ftw:ratesReady', () => { if (window.fillDashboardRates) window.fillDashboardRates(); try { renderDashKpis(); } catch (e) { console.error('dashKpis', e); } try { renderOrders(); renderRevenueTrend(); renderPipeline(); renderOppList(); } catch (e) { console.error('orders', e); } });
 // 新版主页 4 块：机会概览 / 漏斗 / 待办清单 / 实时汇率
 function insertNewDash(v) {
-  const old = v.querySelector('.dashv2-new');
-  const draft = old?.querySelector('#aiChatInput')?.value || '';
-  if (old) old.remove();
-  const div = document.createElement('div');
-  div.className = 'dashv2-new';
-  div.innerHTML = `
-<div class="dashv2-row mid single">
-  <div class="dashv2-card ai-chat-card">
+  let assistant=document.getElementById('flowAssistant');
+  if (assistant && assistant.dataset.userId !== String(currentUser?.id||'')) {assistant.remove();assistant=null;aiChatHistory=[];}
+  if (!assistant) {
+    assistant=document.createElement('aside');
+    assistant.id='flowAssistant';assistant.className='flow-assistant';assistant.hidden=true;assistant.dataset.userId=String(currentUser?.id||'');
+    assistant.setAttribute('aria-label','AI 工作助手');
+    assistant.innerHTML=`<button type="button" class="flow-assistant-close" aria-label="关闭 AI 助手">×</button><div class="dashv2-card ai-chat-card">
     <div class="fc-head"><span>AI 工作助手</span><span class="fc-sub" id="aiChatSub">对话式管理 CRM · 数据实时</span></div>
     <div class="ai-chat-body" id="aiChatBody">
       <div class="ai-msg assistant">
@@ -680,234 +753,123 @@ function insertNewDash(v) {
       <input id="aiChatInput" placeholder="输入指令，Enter 发送…（可先 📎 上传文件）" autocomplete="off" />
       <button id="aiChatSend" class="btn-save" type="button">发送</button>
     </div>
-  </div>
-</div>
-<div class="dashv2-row bot">
-  <div class="dashv2-card todo-card">
-    <div class="td-head"><span>待办清单</span><span class="td-sub" id="tdSub">加载中…</span><button class="td-add" id="tdAddBtn" title="新建任务">+</button></div>
-    <div class="td-tabs">
-      <button type="button" class="td-tab active" data-p="today">今日 <span id="tdC1">0</span></button>
-      <button type="button" class="td-tab" data-p="overdue">超期 <span id="tdC2">0</span></button>
-      <button type="button" class="td-tab" data-p="all">未完成 <span id="tdC3">0</span></button>
-    </div>
-    <div class="td-list" id="tdList"><div class="td-empty">加载中…</div></div>
-  </div>
-  <div class="dashv2-card rate-card">
-    <div class="rc-head"><span>实时汇率</span><span class="rc-sub" id="rateTime">--</span></div>
-    <div class="rate-rows">
-      <div class="rate-row"><span>USD → CNY</span><b id="rc1">--</b></div>
-      <div class="rate-row"><span>USD → EUR</span><b id="rc2">--</b></div>
-      <div class="rate-row"><span>USD → GBP</span><b id="rc3">--</b></div>
-      <div class="rate-row"><span>USD → AED</span><b id="rc4">--</b></div>
-    </div>
-    <button class="rc-refresh" id="rateRefreshBtn">刷新汇率</button>
-  </div>
-</div>`;
-  const grid = v.querySelector('.section-grid') || v.querySelector('.bottom-grid');
-  if (grid) v.insertBefore(div, grid); else v.appendChild(div);
-  // ===== 待办清单：真实任务数据（/api/tasks 按 RBAC 过滤） =====
-  let dashTasks = [];
-  let tdFilter = 'today';
-  function renderDashTodos() {
-    const today = new Date().toISOString().slice(0, 10);
-    const open = dashTasks.filter((t) => !['已完成', '已取消'].includes(t.status || '待办'));
-    const todayList = open.filter((t) => t.dueDate === today);
-    const overdueList = open.filter((t) => t.dueDate && t.dueDate < today);
-    const priOrder = { '高': 0, '中': 1, '低': 2 };
-    const sortByPri = (a, b) => (priOrder[a.priority || '中'] - priOrder[b.priority || '中']) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
-    $('#tdC1').textContent = todayList.length;
-    $('#tdC2').textContent = overdueList.length;
-    $('#tdC3').textContent = open.length;
-    $('#tdSub').innerHTML = `今日 <b>${todayList.length}</b> · 超期 <b>${overdueList.length}</b> · 未完成 <b>${open.length}</b>`;
-    let list = tdFilter === 'today' ? todayList : tdFilter === 'overdue' ? overdueList : open;
-    list = list.slice().sort(sortByPri).slice(0, 30);
-    const host = $('#tdList');
-    if (!host) return;
-    if (!list.length) { host.innerHTML = '<div class="td-empty">' + (tdFilter === 'today' ? '今日暂无待办任务' : tdFilter === 'overdue' ? '没有超期任务，保持得很好' : '没有未完成任务') + '</div>'; return; }
-    host.innerHTML = list.map((t) => {
-      const od = t.dueDate && t.dueDate < today;
-      return `<div class="td-item ${t.status === '已完成' ? 'done' : ''}" data-id="${esc(t.id)}">
-        <input type="checkbox" class="td-check" data-done="${esc(t.id)}" ${t.status === '已完成' ? 'checked' : ''} title="标记完成/重开" />
-        <span class="td-title" title="${esc(t.notes || t.title)}">${esc(t.title)}</span>
-        <span class="td-pri p${esc(t.priority || '中')}">${esc(t.priority || '中')}</span>
-        <span class="td-date ${od ? 'od' : ''}">${esc(t.dueDate || '无日期')}</span>
-      </div>`;
-    }).join('');
-    // 勾选完成/重开
-    host.querySelectorAll('[data-done]').forEach((cb) => cb.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const id = cb.dataset.done;
-      const t = dashTasks.find((x) => x.id === id); if (!t) return;
-      const done = t.status !== '已完成';
-      const body = done ? { status: '已完成', doneAt: Date.now() } : { status: '待办', doneAt: null };
-      const r = await api('/api/tasks/' + id, { method: 'PUT', body: JSON.stringify(body) });
-      if (!r.ok) { toast('更新失败'); cb.checked = !cb.checked; return; }
-      t.status = body.status;
-      toast(done ? '已完成' : '已重开');
-      renderDashTodos();
-    }));
-    // 点击行打开编辑
-    host.querySelectorAll('.td-item').forEach((row) => row.addEventListener('click', () => {
-      const id = row.dataset.id;
-      if (typeof tasks !== 'undefined' && !tasks.some((x) => x.id === id) && typeof loadTasks === 'function') loadTasks().catch(() => {});
-      if (typeof openTaskModal === 'function') setTimeout(() => openTaskModal(id), typeof loadTasks === 'function' ? 250 : 0);
-    }));
+  </div>`;
+    document.body.appendChild(assistant);
+    assistant.querySelector('.flow-assistant-close').onclick=()=>window.toggleFlowAssistant?.(false);
+    initAiChat(assistant);
   }
-  div.querySelectorAll('.td-tab').forEach((t) => t.addEventListener('click', () => {
-    div.querySelectorAll('.td-tab').forEach((x) => x.classList.remove('active'));
-    t.classList.add('active');
-    tdFilter = t.dataset.p;
-    renderDashTodos();
-  }));
-  api('/api/tasks').then((r) => r.json()).then((list) => { dashTasks = Array.isArray(list) ? list : []; renderDashTodos(); }).catch(() => { dashTasks = []; renderDashTodos(); });
-  const addBtn = div.querySelector('#tdAddBtn'); if (addBtn) addBtn.addEventListener('click', () => { if (typeof openTaskModal === 'function') openTaskModal(null); });
-  // AI 管家初始化
-  initAiChat(div);
-  div.querySelector('#aiChatInput').value = draft;
-  // 汇率刷新统一由 ratesReady 同步，包含顶部刷新入口。
   function fillRatesCard() {
-    const pairs = [['rc1', 'CNY'], ['rc2', 'EUR'], ['rc3', 'GBP'], ['rc4', 'AED']];
-    pairs.forEach(([id, sym]) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const v = (rateData && rateData.rates) ? rateData.rates[sym] : null;
-      el.textContent = v ? v.toFixed(4) : '--';
-    });
-    const t = document.getElementById('rateTime');
-    if (t) t.textContent = rateData ? ('更新 ' + new Date(rateData.updated).toLocaleTimeString()) : '--';
-    const rs = document.getElementById('rateSource');
-    if (rs) rs.textContent = rateData ? ('汇率源: ' + rateData.source) : '汇率源: 不可用';
-    const cd = document.getElementById('connDot');
-    if (cd) cd.style.background = rateData ? '#22c55e' : '#e25151';
+    for (const [id,symbol] of [['rc1','CNY'],['rc2','EUR'],['rc3','GBP'],['rc4','AED']]) {
+      const host=document.getElementById(id),value=rateOf('USD',symbol);
+      if(host)host.textContent=value==null?'—':value.toFixed(4);
+    }
+    const stamp=document.getElementById('rateTime');
+    if(stamp)stamp.textContent=rateData?(rateData.source||'汇率')+' · 更新于 '+new Date(rateData.updated).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}):'正在读取汇率…';
   }
-  window.fillDashboardRates = fillRatesCard;
-  if (typeof loadRates === 'function' && !rateData) {
-    loadRates().catch(() => {}).then(fillRatesCard);
-  } else {
-    fillRatesCard();
-  }
-  const rb = div.querySelector('#rateRefreshBtn');
-  if (rb) rb.addEventListener('click', async () => {
-    try { await loadRates(); } catch (e) {}
-    fillRatesCard();
-  });
+  window.fillDashboardRates=fillRatesCard;
+  fillRatesCard();
+  const refresh=document.getElementById('rateRefreshBtn');
+  if(refresh)refresh.onclick=async()=>{if(refresh.disabled)return;refresh.disabled=true;refresh.textContent='刷新中…';try{await loadRates(true);fillRatesCard();}finally{refresh.disabled=false;refresh.textContent='↻ 刷新';}};
 }
 
-// 销售管道（dashboard 设计稿：按询盘阶段分布）
+function dashboardStageKey(status) {
+  return ({'新询盘':'new','已报价':'quote','报价':'quote','等回复':'wait','谈判中':'neg','成交':'won','任务':'task'})[status]||'lost';
+}
+function dashboardStageTag(status) {
+  return `<span class="db-stage db-stage-${dashboardStageKey(status)}">${esc(status)}</span>`;
+}
+function openDashboardInquiryStage(stage) {
+  switchView('enquiry');
+  const button=document.querySelector('#inqStageSummary [data-inq-stage="'+stage+'"]');
+  if(button)button.click();
+}
+// Monthly pipeline shares the prototype's stage river and its count/rate footer.
 function renderPipeline() {
-  const el = $('#pipelineList');
-  if (!el) return;
-  const inqs = window.getAllInquiries ? window.getAllInquiries() : [];
-  const stages = (window.INQ_PIPELINE || []);
-  const counts = stages.map((l) => ({
-    code: l.code, label: l.label,
-    count: inqs.filter((i) => (i.status || '新询盘') === l.code).length,
-    amount: inqs.filter((i) => (i.status || '新询盘') === l.code).reduce((s, i) => s + (toCNY(Number(i.expectedAmount) || 0, i.currency) || 0), 0),
-  }));
-  const max = Math.max(1, ...counts.map((c) => c.count));
-  if (!counts.length) { el.innerHTML = '<div class="empty">暂无管道数据</div>'; return; }
-  el.innerHTML = counts.map((c) => {
-    const pct = Math.round((c.count / max) * 100);
-    const barClass = c.code === '成交' ? 'won' : (c.code === '报价' || c.code === '已报价' ? 'warm' : (c.code === '商务谈判' ? 'hot' : ''));
-    return `<div class="pipeline-item">
-      <div class="pipeline-stage">${esc(c.label)}</div>
-      <div class="pipeline-bar-wrap"><div class="pipeline-bar ${barClass}" style="width:${pct}%"></div></div>
-      <div class="pipeline-count">${c.count}</div>
-      <div class="pipeline-amount">${fmtMoney(c.amount)}</div>
-    </div>`;
-  }).join('');
+  const host=$('#pipelineList');if(!host)return;
+  const month=todayStr().slice(0,7);
+  const inquiries=(window.getAllInquiries?.()||[]).filter(q=>String(q.receivedAt||'').slice(0,7)===month);
+  if(!inquiries.length){host.innerHTML=dashEmpty('本月还没有询盘','登记第一条询盘，管道会按阶段自动统计。','data-dash-create="inquiry"','登记询盘');return;}
+  const stages=(window.INQ_PIPELINE||[]).map(stage=>{
+    const rows=inquiries.filter(q=>(q.status||'新询盘')===stage.code);
+    return {...stage,count:rows.length,amount:rows.reduce((sum,q)=>sum+(toCNY(Number(q.expectedAmount)||0,q.currency)||0),0),tone:dashboardStageKey(stage.code)};
+  });
+  const maximum=Math.max(1,...stages.map(s=>s.count));
+  host.innerHTML=`<div class="db-funnel" role="img" aria-label="本月询盘阶段分布">${stages.filter(s=>s.count).map(s=>`<span style="flex:${s.count};background:var(--s-${s.tone})" title="${esc(s.label)} ${s.count}"></span>`).join('')}</div><div class="db-pipeline-stages">${stages.map(stage=>`<button type="button" class="db-pipeline-row" data-dashboard-stage="${esc(stage.code)}">${dashboardStageTag(stage.label)}<span class="db-pipeline-track"><i style="width:${stage.count/maximum*100}%;background:var(--s-${stage.tone})"></i></span><span class="db-pipeline-count">${stage.count}</span><span class="db-pipeline-amount">${stage.amount?fmtMoney(stage.amount):'—'}</span></button>`).join('')}</div><div class="db-pipeline-foot"><span>本月询盘 <b>${inquiries.length}</b> 条</span><span>成交率 <b>${Math.round(inquiries.filter(q=>q.status==='成交').length/inquiries.length*100)}%</b></span></div>`;
+  host.querySelectorAll('[data-dashboard-stage]').forEach(button=>button.onclick=()=>openDashboardInquiryStage(button.dataset.dashboardStage));
 }
 
-// 今日待办（dashboard 设计稿：待跟进询盘 + 今日任务）
+let dashboardTodoScope='all';
 function renderTodoList() {
-  const el = $('#todoList');
-  if (!el) return;
-  const today = todayStr();
-  const inqs = window.getAllInquiries ? window.getAllInquiries() : [];
-  const pending = inqs.filter((iq) => iq.nextFollowAt && iq.nextFollowAt <= today && (canSeeBusiness(iq.owner)));
-  const tasks = typeof window.getAllTasks === 'function' ? window.getAllTasks().filter((t) => !['已完成', '已取消'].includes(t.status) && t.dueDate && t.dueDate <= today) : [];
-  const rows = [];
-  pending.forEach((iq) => {
-    const overdue = iq.nextFollowAt < today;
-    rows.push({
-      type: 'follow',
-      id: iq.id,
-      clientId: iq.clientId,
-      clientName: iq.clientName || '未指定客户',
-      title: iq.product || '待跟进询盘',
-      desc: `${esc(iq.status || '新询盘')} · 跟进人 ${esc(iq.ownerName || '-')}`,
-      tagClass: overdue ? 'tag-overdue' : 'tag-follow',
-      tagText: overdue ? '已逾期' : '今日跟进',
-      date: iq.nextFollowAt,
-    });
+  const host=$('#todoList');if(!host)return;
+  const today=todayStr(),actor=currentUser?.id;
+  const inquiries=(window.getAllInquiries?.()||[]).filter(q=>q.nextFollowAt&&q.nextFollowAt<=today&&canSeeBusiness(q.owner));
+  const dueTasks=(window.getAllTasks?.()||[]).filter(t=>!['已完成','已取消'].includes(t.status)&&t.dueDate&&t.dueDate<=today);
+  const rows=[...inquiries.map(q=>({kind:'follow',id:q.id,title:q.product||'待跟进询盘',description:q.clientName||'未指定客户',date:q.nextFollowAt,status:q.status||'新询盘'})),...dueTasks.map(t=>({kind:'task',id:t.id,title:t.title||'未命名任务',description:t.clientName||'未关联客户',date:t.dueDate,status:'任务'}))].sort((a,b)=>a.date.localeCompare(b.date));
+  for(const [id,count] of [['dbTodoAll',rows.length],['dbTodoFollow',inquiries.length],['dbTodoTask',dueTasks.length]]){const e=$('#'+id);if(e)e.textContent=count;}
+  const visible=rows.filter(row=>dashboardTodoScope==='all'||row.kind===dashboardTodoScope);
+  if(!visible.length){host.innerHTML=dashEmpty(dashboardTodoScope==='task'?'今日暂无待办任务':'跟进都处理完了','询盘或任务到期会自动出现在这里。',dashboardTodoScope==='task'?'data-dash-create="task"':'data-dash-go="enquiry"',dashboardTodoScope==='task'?'新建任务':'查看新询盘');return;}
+  const messageIcon='<svg viewBox="0 0 24 24"><path d="M21 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 1 1 19 0Z"/></svg>';
+  const snoozeIcon='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5h5"/></svg>';
+  host.innerHTML=visible.slice(0,6).map(row=>{
+    const days=Math.max(0,Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(row.date+'T00:00:00Z'))/86400000));
+    return `<div class="db-todo-row">${row.kind==='task'?`<input type="checkbox" class="db-check" data-flow-task-done="${esc(row.id)}" aria-label="完成任务 ${esc(row.title)}">`:`<button type="button" class="db-check" data-flow-follow="${esc(row.id)}" aria-label="记录跟进：${esc(row.title)}" title="记录跟进">${messageIcon}</button>`}<button type="button" class="flow-todo-open" data-todo-type="${row.kind}" data-todo-id="${esc(row.id)}"><span class="db-todo-title" title="${esc(row.title)}">${esc(row.title)}</span><span class="db-todo-meta">${dashboardStageTag(row.status)}<span title="${esc(row.description)}">${esc(row.description)}</span></span></button><div class="db-due${days?' over':''}">${days?'逾期 '+days+' 天':'今天'}<small>${esc(row.date)}</small></div><div class="db-todo-actions"><button type="button" data-flow-record="${esc(row.id)}" data-kind="${row.kind}" aria-label="${row.kind==='task'?'编辑任务':'记录沟通'}" title="${row.kind==='task'?'编辑任务':'记录沟通'}">${messageIcon}</button><button type="button" data-flow-snooze="${esc(row.id)}" data-kind="${row.kind}" aria-label="延后一天" title="延后一天">${snoozeIcon}</button></div></div>`;
+  }).join('')+`<div class="db-todo-foot"><button type="button" class="db-link" id="dbTodoViewAll">查看全部 ${visible.length} 条${dashboardTodoScope==='task'?'任务':dashboardTodoScope==='follow'?'询盘跟进':'待办与跟进'} →</button></div>`;
+  host.querySelector('#dbTodoViewAll').onclick=()=>{
+    if(dashboardTodoScope==='task')switchView('tasks');
+    else{switchView('enquiry');window.inqFollowFilter=true;if(typeof renderInqList==='function')renderInqList();}
+  };
+  host.querySelectorAll('.flow-todo-open').forEach(button=>button.onclick=()=>{
+    if(button.dataset.todoType==='task')window.openTaskModal?.(button.dataset.todoId);
+    else window.openInqModal?.(button.dataset.todoId);
   });
-  tasks.forEach((t) => {
-    const overdue = t.dueDate < today;
-    rows.push({
-      type: 'task',
-      id: t.id,
-      title: t.title || '未命名任务',
-      desc: `${esc(t.clientName || t.relatedName || '未关联客户')} · ${esc(t.status)}`,
-      tagClass: overdue ? 'tag-overdue' : 'tag-follow',
-      tagText: overdue ? '任务逾期' : '今日任务',
-      date: t.dueDate,
-    });
+  const follow=id=>{if(typeof openInqFollowModal==='function')openInqFollowModal(id);else window.openInqModal?.(id);};
+  host.querySelectorAll('[data-flow-follow]').forEach(button=>button.onclick=()=>follow(button.dataset.flowFollow));
+  host.querySelectorAll('[data-flow-record]').forEach(button=>button.onclick=()=>button.dataset.kind==='task'?window.openTaskModal?.(button.dataset.flowRecord):follow(button.dataset.flowRecord));
+  host.querySelectorAll('[data-flow-task-done]').forEach(checkbox=>checkbox.onchange=async()=>{
+    checkbox.disabled=true;
+    try{
+      const response=await api('/api/tasks/'+encodeURIComponent(checkbox.dataset.flowTaskDone),{method:'PUT',body:JSON.stringify({status:'已完成',doneAt:Date.now()})});
+      if(!response.ok)throw Error('任务更新失败');
+      const updated=await response.json();if(currentUser?.id!==actor)return;
+      Object.assign(dueTasks.find(t=>t.id===checkbox.dataset.flowTaskDone),updated);
+      renderTodoList();renderDashKpis();toast('任务已完成');
+    }catch(error){checkbox.checked=false;checkbox.disabled=false;toast(error.message);}
   });
-  if (!rows.length) { el.innerHTML = '<div class="empty" style="padding:20px 16px">今天没有待办事项</div>'; return; }
-  rows.sort((a, b) => a.date.localeCompare(b.date));
-  el.innerHTML = rows.map((r) => `<div class="todo-item" data-todo-type="${r.type}" data-todo-id="${esc(r.id)}" ${r.clientId ? `data-todo-client="${esc(r.clientId)}"` : ''}>
-    <div class="todo-avatar">${esc((r.clientName || r.title).slice(0, 1).toUpperCase())}</div>
-    <div class="todo-content">
-      <div class="todo-title">${esc(r.title)}</div>
-      <div class="todo-desc">${esc(r.desc)}</div>
-      <span class="todo-tag ${r.tagClass}">${esc(r.tagText)}</span>
-    </div>
-    <div class="todo-date">${esc(r.date)}</div>
-  </div>`).join('');
-  el.querySelectorAll('.todo-item').forEach((row) => row.onclick = () => {
-    const type = row.dataset.todoType;
-    const cid = row.dataset.todoClient;
-    if (cid) viewClientDetail(cid);
-    else if (type === 'task') switchView('tasks');
-    else if (type === 'follow' && typeof openInqModal === 'function') openInqModal(row.dataset.todoId);
+  host.querySelectorAll('[data-flow-snooze]').forEach(button=>button.onclick=async()=>{
+    if(button.disabled)return;button.disabled=true;
+    const next=new Date(today+'T12:00:00');next.setDate(next.getDate()+1);
+    const date=next.getFullYear()+'-'+String(next.getMonth()+1).padStart(2,'0')+'-'+String(next.getDate()).padStart(2,'0');
+    const task=button.dataset.kind==='task',id=button.dataset.flowSnooze;
+    try{
+      const response=await api('/api/'+(task?'tasks':'inquiries')+'/'+encodeURIComponent(id),{method:'PUT',body:JSON.stringify(task?{dueDate:date}:{nextFollowAt:date})});
+      if(!response.ok)throw Error('延后失败，请重试');const updated=await response.json();if(currentUser?.id!==actor)return;
+      Object.assign((task?dueTasks:inquiries).find(row=>row.id===id),updated);
+      renderTodoList();renderDashKpis();toast('已延后到 '+date);
+    }catch(error){button.disabled=false;toast(error.message);}
   });
 }
 
 // 活跃商机（dashboard 设计稿：近 7 天有更新的询盘）
+let dashboardCountryCodes;
+function dashboardCountryCode(country){
+ if(!dashboardCountryCodes){
+  dashboardCountryCodes=new Map();
+  const names=['zh-CN','en'].map(locale=>new Intl.DisplayNames([locale],{type:'region'}));
+  for(let a=65;a<=90;a++)for(let b=65;b<=90;b++){
+   const code=String.fromCharCode(a,b);
+   names.forEach(format=>{const label=format.of(code);if(label!==code)dashboardCountryCodes.set(label.toLocaleLowerCase(),code);});
+  }
+  ['Korea','South Korea','Republic of Korea'].forEach(name=>dashboardCountryCodes.set(name.toLocaleLowerCase(),'KR'));
+ }
+ const value=String(country||'').normalize('NFKC').trim();
+ return dashboardCountryCodes.get(value.toLocaleLowerCase())||(/^[A-Za-z]{2}$/.test(value)?value.toUpperCase():'—');
+}
 function renderOppList() {
-  const el = $('#oppList');
-  if (!el) return;
-  const inqs = window.getAllInquiries ? window.getAllInquiries() : [];
-  const now = new Date();
-  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(now.getDate() - 7);
-  const iso7 = sevenDaysAgo.toISOString().slice(0, 10);
-  const recent = inqs.filter((iq) => {
-    const updated = iq.updatedAt ? new Date(iq.updatedAt).toISOString().slice(0, 10) : (iq.receivedAt || '');
-    return updated >= iso7;
-  }).slice().sort((a, b) => (b.updatedAt || b.receivedAt || '') - (a.updatedAt || a.receivedAt || '')).slice(0, 8);
-  if (!recent.length) { el.innerHTML = '<div class="empty" style="padding:20px 16px">近 7 天暂无活跃商机</div>'; return; }
-  el.innerHTML = recent.map((iq) => {
-    const amount = toCNY(Number(iq.expectedAmount) || 0, iq.currency) || 0;
-    const stageClass = (iq.status || '新询盘') === '新询盘' ? 'stage-new' : ((iq.status || '').includes('报价') ? 'stage-quote' : 'stage-confirm');
-    return `<div class="opp-card" data-opp-client="${esc(iq.clientId || '')}" data-opp-name="${esc(iq.clientName || '')}">
-      <div class="opp-left">
-        <div class="opp-avatar">${esc((iq.clientName || iq.product || '?').slice(0, 1).toUpperCase())}</div>
-        <div class="opp-content">
-          <div class="opp-name">${esc(iq.clientName || '未指定客户')}</div>
-          <div class="opp-meta">${esc(iq.product || '—')} · ${esc(iq.country || '-')}</div>
-        </div>
-      </div>
-      <div class="opp-right">
-        <div class="opp-amount">${amount ? fmtMoney(amount) : '—'}</div>
-        <span class="opp-status ${stageClass}">${esc(iq.status || '新询盘')}</span>
-      </div>
-    </div>`;
-  }).join('');
-  el.querySelectorAll('.opp-card').forEach((card) => card.onclick = () => {
-    const cid = card.dataset.oppClient;
-    if (cid) viewClientDetail(cid);
-    else openClientDetailByName(card.dataset.oppName);
-  });
+  const host=$('#oppList');if(!host)return;
+  const recent=(window.getAllInquiries?.()||[]).filter(q=>new Date(q.updatedAt||q.receivedAt).getTime()>=Date.now()-7*86400000).sort((a,b)=>new Date(b.updatedAt||b.receivedAt)-new Date(a.updatedAt||a.receivedAt)).slice(0,8);
+  if(!recent.length){host.innerHTML=dashEmpty('近 7 天没有商机更新','有新报价或沟通记录时会出现在这里。','data-dash-go="enquiry"','查看询盘');return;}
+  host.innerHTML=recent.map(q=>{const amount=toCNY(Number(q.expectedAmount)||0,q.currency)||0;return `<button type="button" class="db-deal" data-opp-client="${esc(q.clientId||'')}" data-opp-name="${esc(q.clientName||'')}"><span class="db-deal-avatar">${esc(dashboardCountryCode(q.country))}</span><span class="db-deal-content"><span class="db-deal-name" title="${esc(q.clientName||'未指定客户')}">${esc(q.clientName||'未指定客户')}</span><span class="db-deal-product" title="${esc(q.product||'—')} · ${esc(q.country||'-')}">${esc(q.product||'—')} · ${esc(q.country||'-')}</span></span><span class="db-deal-right"><b>${amount?fmtMoney(amount):'—'}</b>${dashboardStageTag(q.status||'新询盘')}</span></button>`;}).join('');
+  host.querySelectorAll('.db-deal').forEach(button=>button.onclick=()=>button.dataset.oppClient?viewClientDetail(button.dataset.oppClient):openClientDetailByName(button.dataset.oppName));
 }
 
 function renderActionQueue(pending) {
@@ -1112,6 +1074,7 @@ function wireAiChatAttach() {
 async function sendAiChat(text) {
   text = (text || '').trim();
   if (!text || aiChatBusy) return;
+  const chatUserId=currentUser?.id;
   aiChatBusy = true;
   const input = $('#aiChatInput'); if (input) input.disabled = true;
   const sendBtn = $('#aiChatSend'); if (sendBtn) sendBtn.disabled = true;
@@ -1133,6 +1096,7 @@ async function sendAiChat(text) {
       body: JSON.stringify({ messages: msgs }),
     });
     const j = await r.json();
+    if(currentUser?.id!==chatUserId)return;
     if (!r.ok) throw new Error(j.error || 'AI 调用失败');
 
     const parts = [];
@@ -1220,95 +1184,41 @@ function initAiChat(div) {
 
 
 function renderRevenueTrend() {
-  const el = $('#revenueTrend');
-  if (!el) return;
-  // 最近 12 个月（含当月）
-  const months = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  const host=$('#revenueTrend');if(!host)return;
+  const now=new Date(),months=Array.from({length:12},(_,index)=>{const d=new Date(now.getFullYear(),now.getMonth()-11+index,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});
+  const values=months.map(month=>orders.filter(order=>orderMonthKey(order)===month&&FTWOrderWorkflow.isDeal(order)).reduce((sum,order)=>sum+(toCNY(Number(order.amount)||0,order.currency)||0),0));
+  const total=values.reduce((sum,value)=>sum+value,0);
+  if(!total){host.innerHTML='<div class="dash-empty"><strong>暂无成交订单数据</strong><p>订单进入「生产中」后会计入成交。</p></div>';return;}
+  const W=760,H=220,PL=40,PR=4,PT=12,PB=26,IW=W-PL-PR,IH=H-PT-PB,step=IW/12;
+  const raw=Math.max(...values)/10000,mag=Math.pow(10,Math.floor(Math.log10(raw||1))),max=Math.ceil(raw/(mag/2))*(mag/2)||1;
+  const y=value=>PT+IH*(1-value/max);
+  let grid='';
+  for(let i=0;i<=4;i++){
+    const value=max*i/4,label=Number(value.toFixed(2)).toLocaleString('zh-CN');
+    grid+=`<line class="db-chart-grid" x1="${PL}" x2="${W-PR}" y1="${y(value)}" y2="${y(value)}"/><text class="db-chart-axis" x="${PL-8}" y="${y(value)+4}" text-anchor="end">${label}</text>`;
   }
-  const vals = months.map((m) => orders
-    .filter((o) => (o.orderDate || '').slice(0, 7) === m && !['已取消', 'Cancelled'].includes(o.status))
-    .reduce((s, o) => s + (toCNY(Number(o.amount) || 0, o.currency) || 0), 0));
-  const total = vals.reduce((s, v) => s + v, 0);
-  if (!total) { el.innerHTML = '<div class="empty" style="padding:36px 0">暂无成交订单数据</div>'; return; }
-  // 画布几何
-  const W = 600, H = 270, PL = 50, PR = 18, PT = 18, PB = 30;
-  const IW = W - PL - PR, IH = H - PT - PB;
-  const niceMax = (() => {
-    const raw = Math.max(...vals);
-    const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
-    const n = Math.ceil(raw / (mag / 2)) * (mag / 2);
-    return n || 1;
-  })();
-  const X = (i) => PL + (IW / 11) * i;
-  const Y = (v) => PT + IH - (v / niceMax) * IH;
-  const fmtK = (v) => v >= 1e8 ? (v / 1e8).toFixed(1) + '亿' : v >= 1e4 ? (v / 1e4).toFixed(v >= 1e5 ? 0 : 1) + '万' : Math.round(v).toLocaleString();
-  // 网格线 + y 轴刻度
-  let grid = '';
-  for (let g = 0; g <= 4; g++) {
-    const v = (niceMax / 4) * g;
-    const y = Y(v);
-    grid += `<line x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}" stroke="var(--line-2, #eee)" stroke-width="1"/>`
-      + `<text x="${PL - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--muted, #999)">${fmtK(v)}</text>`;
+  const bars=values.map((value,index)=>{const h=IH*value/10000/max,x=PL+index*step+step*.22;return `<rect class="db-revenue-bar${index===11?' current':''}" tabindex="0" role="img" aria-label="${months[index]}：${fmtMoney(value)}" data-revenue-month="${index}" x="${x}" y="${H-PB-h}" width="${step*.56}" height="${Math.max(1,h)}" rx="2"><title>${months[index]}：${fmtMoney(value)}</title></rect><text class="db-chart-axis" x="${x+step*.28}" y="${H-8}" text-anchor="middle">${Number(months[index].slice(5))}月</text>`;}).join('');
+  host.innerHTML=`<div class="db-chart-summary"><div><span>近 12 个月合计</span><b id="dbRevenueTotal">${fmtMoney(total)}</b></div><div><span>本月</span><b id="dbRevenueCurrent">${fmtMoney(values[11])}</b></div><div><span>月均</span><b>${fmtMoney(total/12)}</b></div><div class="db-chart-unit"><span>单位：万元</span></div></div><div class="db-chart"><div class="db-chart-scroll"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="近 12 个月收入柱状图，单位万元">${grid}${bars}</svg></div><div class="db-chart-tooltip" role="status" hidden></div></div>`;
+  const chart=host.querySelector('.db-chart'),tip=host.querySelector('.db-chart-tooltip'),svg=host.querySelector('svg');
+  const rects=[...host.querySelectorAll('[data-revenue-month]')];
+  function show(bar){
+    const index=Number(bar.dataset.revenueMonth);tip.innerHTML=months[index]+'<b>'+fmtMoney(values[index])+' CNY</b>';tip.hidden=false;
+    const box=bar.getBoundingClientRect(),frame=chart.getBoundingClientRect();
+    tip.style.left=Math.max(12,Math.min(frame.width-tip.offsetWidth-12,box.left-frame.left+box.width/2-tip.offsetWidth/2))+'px';
+    tip.style.top=Math.max(0,box.top-frame.top-tip.offsetHeight-8)+'px';
   }
-  // 面积 + 折线路径
-  const pts = vals.map((v, i) => [X(i), Y(v)]);
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-  const area = line + ` L${X(11)} ${PT + IH} L${PL} ${PT + IH} Z`;
-  const dots = pts.map((p, i) => {
-    const cur = i === 11;
-    return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${cur ? 4.5 : 3}" fill="${cur ? 'var(--brand, #f1481e)' : 'var(--panel, #fff)'}" stroke="var(--brand, #5b8def)" stroke-width="2"><title>${months[i]}：¥${vals[i].toLocaleString(undefined, { maximumFractionDigits: 0 })}</title></circle>`;
-  }).join('');
-  const labels = months.map((m, i) => `<text x="${X(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted, #999)">${i % 2 === 0 || i === 11 ? m.slice(5)+'月' : ''}</text>`).join('');
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" tabindex="0" aria-label="近12个月收入趋势，左右方向键查看各月金额">
-    <defs><linearGradient id="rtFill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--brand, #5b8def)" stop-opacity=".22"/>
-      <stop offset="100%" stop-color="var(--brand, #5b8def)" stop-opacity="0"/>
-    </linearGradient></defs>
-    ${grid}
-    <path d="${area}" fill="url(#rtFill)"/>
-    <path d="${line}" fill="none" stroke="var(--brand, #5b8def)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    ${dots}${labels}<line class="rt-guide" x1="0" x2="0" y1="${PT}" y2="${PT+IH}" stroke="var(--brand,#2563eb)" stroke-dasharray="4 4" visibility="hidden"/><circle class="rt-active" r="6" fill="var(--brand,#2563eb)" stroke="white" stroke-width="2" visibility="hidden"/>
-  </svg><div class="rt-tooltip" role="status" hidden></div>
-  <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted,#999);margin-top:2px">
-    <span>12 个月合计：<b style="color:var(--ink,#333)">${typeof fmtMoney === 'function' ? fmtMoney(total) : '¥' + Math.round(total).toLocaleString()}</b></span>
-    <span>本月：<b style="color:var(--brand,#5b8def)">${typeof fmtMoney === 'function' ? fmtMoney(vals[11]) : '¥' + Math.round(vals[11]).toLocaleString()}</b></span>
-  </div>`;
-  const svg = el.querySelector('svg'), tip = el.querySelector('.rt-tooltip');
-  const guide = el.querySelector('.rt-guide'), active = el.querySelector('.rt-active');
-  let selected = 11;
-  function showMonth(i) {
-    selected = Math.max(0, Math.min(11, i));
-    const x = X(selected), y = Y(vals[selected]);
-    guide.setAttribute('x1', x); guide.setAttribute('x2', x);
-    active.setAttribute('cx', x); active.setAttribute('cy', y);
-    guide.setAttribute('visibility', 'visible'); active.setAttribute('visibility', 'visible');
-    tip.textContent = months[selected] + ' · ¥' + vals[selected].toLocaleString('zh-CN', {minimumFractionDigits:2,maximumFractionDigits:2}) + ' CNY';
-    tip.hidden = false;
-    const point = new DOMPoint(x,y).matrixTransform(svg.getScreenCTM());
-    const box = el.getBoundingClientRect();
-    tip.style.left = Math.max(0, Math.min(box.width-tip.offsetWidth, point.x-box.left-tip.offsetWidth/2)) + 'px';
-    tip.style.top = Math.max(0, point.y-box.top-tip.offsetHeight-12) + 'px';
-  }
-  function hideTip() {tip.hidden=true;guide.setAttribute('visibility','hidden');active.setAttribute('visibility','hidden');}
-  function pointMonth(e) {
-    const point = new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
-    showMonth(Math.round((point.x-PL)/IW*11));
-  }
-  svg.addEventListener('pointermove', pointMonth);
-  svg.addEventListener('pointerdown', pointMonth);
-  svg.addEventListener('pointerleave', e => {if(e.pointerType !== 'touch')hideTip();});
-  svg.addEventListener('focus', () => showMonth(selected));
-  svg.addEventListener('blur', hideTip);
-  svg.addEventListener('keydown', e => {
-    if(e.key==='Escape'){hideTip();return;}
-    if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
-    e.preventDefault();showMonth(e.key==='Home'?0:e.key==='End'?11:selected+(e.key==='ArrowLeft'?-1:1));
+  rects.forEach(bar=>{
+    bar.addEventListener('pointerenter',()=>show(bar));bar.addEventListener('pointerdown',()=>show(bar));bar.addEventListener('focus',()=>show(bar));
+    bar.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){tip.hidden=true;return;}
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();
+      const i=Number(bar.dataset.revenueMonth),next=event.key==='Home'?0:event.key==='End'?11:Math.max(0,Math.min(11,i+(event.key==='ArrowRight'?1:-1)));
+      rects[next].focus();rects[next].scrollIntoView({block:'nearest',inline:'nearest'});
+    });
   });
-
+  svg.addEventListener('pointerleave',event=>{if(event.pointerType!=='touch')tip.hidden=true;});
+  svg.addEventListener('focusout',event=>{if(!svg.contains(event.relatedTarget))tip.hidden=true;});
+  host.querySelector('.db-chart-scroll').addEventListener('scroll',()=>{tip.hidden=true;});
 }
 window.renderRevenueTrend = renderRevenueTrend;
 
@@ -1335,7 +1245,7 @@ function openClientDrawer(clientId) {
   const myComms = (window.getAllComms ? window.getAllComms() : [])
     .filter((x) => (x.clientName || '').trim().toLowerCase() === (c.company || '').trim().toLowerCase())
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const dealOrders = myOrders.filter((o) => ['已收款', '已发货'].includes(o.status || ''));
+  const dealOrders = myOrders.filter((o) => FTWOrderWorkflow.isDeal(o));
   const cumCNY = dealOrders.reduce((s, o) => s + (toCNY(Number(o.amount) || 0, o.currency) || 0), 0);
   const grade = gradeOf(c.stage);
   const gradeClass = 'tag-' + String(grade).toLowerCase().replace(/\+/g, 'plus');
@@ -1436,7 +1346,7 @@ function renderClientDetail() {
   const consAll = (window.getContactsByClient ? window.getContactsByClient(c.id) : []);
   const prim = consAll.find((x) => x.isPrimary) || consAll[0];
   const createdAtStr = (c.createdAt || c.updatedAt) ? new Date(c.createdAt || c.updatedAt).toISOString().slice(0, 10) : '-';
-  const dealOrders = myOrders.filter((o) => ['已收款', '已发货'].includes(o.status || ''));
+  const dealOrders = myOrders.filter((o) => FTWOrderWorkflow.isDeal(o));
   const cumCNY = dealOrders.reduce((s, o) => s + (toCNY(Number(o.amount) || 0, o.currency) || 0), 0);
   const dealDates = dealOrders.map((o) => o.orderDate || o.deliveryDate || (o.createdAt ? new Date(o.createdAt).toISOString().slice(0, 10) : '')).filter(Boolean).sort();
   const lastDeal = dealDates.length ? dealDates[dealDates.length - 1] : '-';
@@ -1602,7 +1512,7 @@ function qtStatusTag(st) {
 }
 
 function orderStatusTag(st) {
-  const map = { '待确认': 'pending', '已确认': 'confirmed', '生产中': 'producing', '已发货': 'shipped', '已收款': 'paid', '已完成': 'completed', '已取消': 'cancelled' };
+  const map = { '待确认': 'pending', '待收预付款':'pending', '已确认': 'confirmed', '生产中': 'producing', '待收尾款':'pending', '待发货':'paid', '已发货': 'shipped', '已收款': 'paid', '已完成': 'completed', '已取消': 'cancelled' };
   return `<span class="status-tag status-${map[st] || 'pending'}">${esc(st || '待确认')}</span>`;
 }
 
@@ -1652,7 +1562,7 @@ const _INQ_PHASE_MAP = { '新询盘': '初步接触', '已报价': '报价中', 
 // 询盘与客户的匹配：clientId 优先，无则公司名 trim+lowercase 宽松匹配（兼容历史数据只存名字）
 function inqMatchesClient(iq, c) {
   if (!iq || !c) return false;
-  if (iq.clientId && c.id && String(iq.clientId) === String(c.id)) return true;
+  if (iq.clientId && c.id) return String(iq.clientId) === String(c.id);
   const a = String(iq.clientName || '').trim().toLowerCase();
   const b = String(c.company || '').trim().toLowerCase();
   return !!a && !!b && a === b;
@@ -1953,9 +1863,9 @@ function clVisibleCells(tr) {
 // 由它吃掉/让出富余宽度，其余列保内容不截断。
 const CL_COL_MIN_W = {
   check: 48, star: 56, name: 150, contact: 120, owner: 96, country: 84, phase: 88, grade: 64, source: 84,
-  phone: 140, prod: 120, comm: 150, health: 74, ai: 70, created: 92, rel: 76, ops: 126,
+  phone: 140, prod: 120, comm: 150, health: 74, ai: 70, created: 92, follow: 114, rel: 76, ops: 126,
 };
-function clColMinW(k) { return CL_COL_MIN_W[k] || 50; }
+function clColMinW(k) { if(document.querySelector('#crm-clients .crm-client-table'))return ({check:40,star:36,name:200,customerPhase:86,grade:64,owner:100,phase:100,rel:110,follow:110,yearAmount:130,created:92,ops:44})[k]||64;return CL_COL_MIN_W[k] || 50; }
 
 // 拖动时的总宽同步：只累加各列（含下限），不动其它列，让被拖的列真正变宽
 function clSyncTableWidth(table, widths) {
@@ -2205,13 +2115,13 @@ function renderClientSummary() {
     csNew:clients.filter(c=>{const d=new Date(c.createdAt).getTime();return d>=since && d<=now;}).length,
     csDue:clients.filter(c=>c.nextFollowUp && c.nextFollowUp<=todayStr()).length};
   Object.entries(counts).forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n.toLocaleString('zh-CN');});
-  document.querySelectorAll('[data-client-scope]').forEach(button=>{
-    const active=button.dataset.clientScope===clientScope;
+  document.querySelectorAll('[data-client-scope], [data-client-summary-scope]').forEach(button=>{
+    const active=(button.dataset.clientScope||button.dataset.clientSummaryScope)===clientScope;
     button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));
   });
 }
-document.querySelectorAll('[data-client-scope]').forEach(button=>button.addEventListener('click',()=>{
-  clientScope=button.dataset.clientScope;clientFollowFilter=false;clientSelected.clear();renderClients();
+document.querySelectorAll('[data-client-scope], [data-client-summary-scope]').forEach(button=>button.addEventListener('click',()=>{
+  clientScope=button.dataset.clientScope||button.dataset.clientSummaryScope;clientFollowFilter=false;clientSelected.clear();renderClients();
 }));
 // Close secondary actions after selection; Esc also dismisses the menu.
 document.addEventListener('click',event=>{
@@ -2225,6 +2135,8 @@ function filteredClientBase(){
  if(clientScope==='mine' && String(c.owner)!==String(currentUser?.id))return false;
  if(clientScope==='star' && !c.star)return false;
  if(clientScope==='due' && !(c.nextFollowUp && c.nextFollowUp<=todayStr()))return false;
+ if(clientScope==='new'){const stamp=new Date(c.createdAt).getTime();if(!(stamp>=Date.now()-30*86400000&&stamp<=Date.now()))return false;}
+ if(clientScope==='high' && !['S','A'].includes(gradeOf(c.stage)))return false;
  if(q&&![c.company,c.contactName,c.contactPhone,c.contactEmail,c.country,c.source,c.productInterest].some(v=>String(v||'').toLowerCase().includes(q)))return false;
  for(const [id,key] of [['cfOwner','owner'],['cfCountry','country'],['cfSource','source']]){const v=val(id);if(v&&String(c[key]||'')!==(v==='__empty__'?'':v))return false;}
  const follow=val('cfFollow');if(follow==='due'&&!(c.nextFollowUp&&c.nextFollowUp<=todayStr()))return false;if(follow==='missing'&&c.nextFollowUp)return false;if(follow==='stale'&&!isStaleClient(c))return false;
@@ -2234,6 +2146,7 @@ function filteredClientBase(){
  });
 }
 function renderClients() {
+  if(window.crmClientRender)return window.crmClientRender();
   const searchEl = $('#clientSearch');
   const q = ((searchEl && searchEl.value) || '').toLowerCase();
   const body = $('#clientBody');
@@ -2262,8 +2175,11 @@ function renderClients() {
 
   const listIds = new Set(list.map((c) => c.id));
   for (const id of clientSelected) { if (!listIds.has(id)) clientSelected.delete(id); }
-  if (!list.length) { body.innerHTML = '<tr><td colspan="17" class="empty">'+(clients.length ? '没有符合条件的客户，请调整搜索或筛选条件' : '暂无客户，点击右上角「新增客户」开始录入')+'</td></tr>'; renderClientBatchBar(); applyClientColOrder(); return; }
-  body.innerHTML = list.map((c, i) => {
+  const pageRows = clientPaginate(list);
+  renderClientWorkspace(pageRows, list.length);
+  if (!list.length) { body.innerHTML = '<tr><td colspan="18" class="empty">'+clientEmptyHtml()+'</td></tr>'; renderClientBatchBar(); applyClientColOrder(); window.applyClientTableColumns?.(); return; }
+  const clientSurface = $('#view-clients');
+  body.innerHTML = pageRows.map((c, i) => {
     const grade = gradeOf(c.stage);
     const gradeClass = 'tag-' + String(grade).toLowerCase().replace(/\+/g, 'plus');
     const createdStr = c.createdAt ? new Date(c.createdAt).toISOString().slice(0, 10) : '-';
@@ -2284,10 +2200,10 @@ function renderClients() {
       : '';
     return `<tr class="${clientSelected.has(c.id) ? 'sel' : ''}">
       <td data-col="check"><input type="checkbox" class="cb-client" data-cid="${esc(c.id)}" ${clientSelected.has(c.id) ? 'checked' : ''} /></td>
-      <td class="cl-col-star" data-col="star"><span class="cl-star ${c.star ? 'on' : ''}" data-star-c="${esc(c.id)}" title="星标">★</span></td>
+      <td class="cl-col-star" data-col="star"><button type="button" class="cl-star ${c.star ? 'on' : ''}" data-star-c="${esc(c.id)}" aria-pressed="${!!c.star}" title="星标">★</button></td>
       <td class="cl-name-cell" data-col="name">
         <button type="button" class="cl-name" data-detail-c="${esc(c.id)}">
-          <div class="cl-name-l1">${esc(c.company || '未命名')}</div>
+          <div class="cl-name-l1">${esc(c.company || '未命名')}</div><span class="client-name-contact">${esc(c.contactName || '未填写联系人')}</span>
           ${cat ? `<span class="cl-cat">${esc(cat)}</span>` : ''}
         </button>
       </td>
@@ -2300,9 +2216,10 @@ function renderClients() {
       <td class="cl-phone" data-col="phone">${phoneShown}${phoneRaw ? ` <a class="cl-reveal" data-reveal-c="${esc(c.id)}">${revealed ? '隐藏' : '显示'}</a>` : ''}</td>
       <td class="cl-prod" data-col="prod">${esc(prod || '-')}</td>
       <td class="cl-comm" data-col="comm">${comm ? `<div class="cl-comm-txt" title="${esc(comm.content)}">${esc(comm.content)}</div><div class="cl-comm-date">🕐 ${esc(comm.date || '')}</div>` : '<span class="muted">—</span>'}</td>
-      <td data-col="health"><span class="cl-health ${healthClass(score)}" title="跟进健康度（按最近跟进时间计算）">${score}</span></td>
+      <td data-col="health"><span class="cl-health ${healthClass(score)}" title="跟进活跃度：按最近跟进时间估算，有订单时分数保底；不代表客户信用或付款风险">${score}</span></td>
       <td data-col="ai"><button class="cl-ai" data-ai-c="${esc(c.id)}" title="AI 跟进建议">✨</button></td>
       <td class="cl-created" data-col="created">${esc(createdStr)}</td>
+      <td data-col="follow">${clientFollowHtml(c)}</td>
       <td data-col="rel"><span class="cl-rel ${rel.cls}">${esc(rel.label)}</span></td>
       <td class="text-center" data-col="ops">
         <button class="action-btn" data-peek-c="${esc(c.id)}" title="速览（侧板）">
@@ -2316,20 +2233,20 @@ function renderClients() {
         </button>
       </td>
     </tr>`; }).join('');
-  body.querySelectorAll('[data-peek-c]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); openClientDrawer(b.dataset.peekC); }));
-  body.querySelectorAll('[data-detail-c]').forEach((b) => b.addEventListener('click', () => viewClientDetail(b.dataset.detailC)));
-  body.querySelectorAll('[data-edit-c]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); openClientModal(b.dataset.editC); }));
-  body.querySelectorAll('[data-del-c]').forEach((b) => b.addEventListener('click', async (e) => {
+  clientSurface.querySelectorAll('[data-peek-c]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); openClientDrawer(b.dataset.peekC); }));
+  clientSurface.querySelectorAll('[data-detail-c]').forEach((b) => b.addEventListener('click', () => viewClientDetail(b.dataset.detailC)));
+  clientSurface.querySelectorAll('[data-edit-c]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); openClientModal(b.dataset.editC); }));
+  clientSurface.querySelectorAll('[data-del-c]').forEach((b) => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (confirm('确认删除该客户？')) { await api('/api/clients/' + b.dataset.delC, { method: 'DELETE' }); toast('已删除'); loadAll(); }
   }));
-  body.querySelectorAll('.cb-client').forEach((cb) => cb.addEventListener('change', (e) => {
+  clientSurface.querySelectorAll('.cb-client, .client-card-check').forEach((cb) => cb.addEventListener('change', (e) => {
     e.stopPropagation();
     if (cb.checked) clientSelected.add(cb.dataset.cid); else clientSelected.delete(cb.dataset.cid);
     renderClientBatchBar();
   }));
   // 星标
-  body.querySelectorAll('[data-star-c]').forEach((s) => s.addEventListener('click', async (e) => {
+  clientSurface.querySelectorAll('[data-star-c]').forEach((s) => s.addEventListener('click', async (e) => {
     e.stopPropagation();
     const c = clients.find((x) => x.id === s.dataset.starC);
     if (!c) return;
@@ -2342,7 +2259,7 @@ function renderClients() {
     renderClients();
   }));
   // 在途询盘徽标 → 跳询盘商机界面并按该客户过滤（v20260902d；阶段列已改为在途询盘数，行内阶段下拉移除）
-  body.querySelectorAll('[data-ibadge-c]').forEach((a) => a.addEventListener('click', (e) => {
+  clientSurface.querySelectorAll('[data-ibadge-c]').forEach((a) => a.addEventListener('click', (e) => {
     e.stopPropagation();
     const cc = clients.find((x) => x.id === a.dataset.ibadgeC);
     if (!cc) return;
@@ -2355,35 +2272,37 @@ function renderClients() {
     toast('询盘已按「' + (cc.company || '') + '」过滤');
   }));
   // 编辑模式下行内变更级别
-  body.querySelectorAll('[data-grade-c]').forEach((sel) => sel.addEventListener('change', async (e) => {
+  clientSurface.querySelectorAll('[data-grade-c]').forEach((sel) => sel.addEventListener('change', async (e) => {
     e.stopPropagation();
     await updateClientField(sel.dataset.gradeC, { stage: sel.value }, '级别已更新为 ' + sel.value);
   }));
   // 手机号 显示/隐藏
-  body.querySelectorAll('[data-reveal-c]').forEach((a) => a.addEventListener('click', (e) => {
+  clientSurface.querySelectorAll('[data-reveal-c]').forEach((a) => a.addEventListener('click', (e) => {
     e.stopPropagation();
     const id = a.dataset.revealC;
     if (revealedPhones.has(id)) revealedPhones.delete(id); else revealedPhones.add(id);
     renderClients();
   }));
   // 行内 AI 建议
-  body.querySelectorAll('[data-ai-c]').forEach((b) => b.addEventListener('click', (e) => {
+  clientSurface.querySelectorAll('[data-ai-c]').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
     openAiClientAdvice(b.dataset.aiC);
   }));
   renderClientBatchBar();
   if (searchEl) searchEl.oninput = () => { clientFollowFilter = false; renderClients(); };
   applyClientColOrder();
+  window.applyClientTableColumns?.();
 }
-document.getElementById('cbClientAll').addEventListener('change', () => {
-  const cbs = document.querySelectorAll('#clientBody .cb-client');
-  if (document.getElementById('cbClientAll').checked) cbs.forEach((cb) => clientSelected.add(cb.dataset.cid));
-  else cbs.forEach((cb) => clientSelected.delete(cb.dataset.cid));
+document.getElementById('cbClientAll')?.addEventListener('change', () => {
+  if (document.getElementById('cbClientAll').checked) clientPageRows.forEach(c => clientSelected.add(c.id));
+  else clientPageRows.forEach(c => clientSelected.delete(c.id));
   renderClients();
 });
 // 勾选状态只更新顶部「批量编辑 / 批量删除」按钮的计数与高亮，实际编辑走弹窗
 function renderClientBatchBar() {
+  if(window.crmClientBatch)return window.crmClientBatch();
   const n = clientSelected.size;
+  document.querySelectorAll('#view-clients .cb-client, #view-clients .client-card-check').forEach(box=>{box.checked=clientSelected.has(box.dataset.cid);box.closest('tr, .client-card')?.classList.toggle('sel',box.checked);});
   const bar = document.getElementById('clientBatchBar');
   if (bar) bar.classList.toggle('hidden', !(clientEditMode || n > 0));
   const info = document.getElementById('clientBatchInfo');
@@ -2402,9 +2321,11 @@ function renderClientBatchBar() {
   }
   const all = document.getElementById('cbClientAll');
   if (all) {
-    const total = document.querySelectorAll('#clientBody .cb-client').length;
-    all.checked = total > 0 && n >= total;
-    all.indeterminate = n > 0 && n < total;
+    const total = clientPageRows.length;
+    const checked = clientPageRows.filter(c => clientSelected.has(c.id)).length;
+    all.checked = total > 0 && checked === total;
+    all.indeterminate = checked > 0 && checked < total;
+    const pageSelect=document.getElementById('clientSelectPage');if(pageSelect){pageSelect.checked=all.checked;pageSelect.indeterminate=all.indeterminate;}
   }
 }
 
@@ -2439,30 +2360,11 @@ async function quickTaskForClients() {
 
 // 去重检查：按 公司名 / 电话 / 邮箱 归并查找重复客户
 function openClientDedup() {
-  const norm = (s) => String(s || '').toLowerCase().replace(/[\s\-_.,，。()（）+]/g, '');
-  // 并查集归并重复簇
-  const parent = new Map(clients.map((c) => [c.id, c.id]));
-  const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
-  const union = (a, b) => { parent.set(find(a), find(b)); };
-  const keyOwner = new Map();
-  clients.forEach((c) => {
-    const keys = [];
-    if (norm(c.company)) keys.push('co:' + norm(c.company));
-    if (c.contactPhone) keys.push('ph:' + norm(c.contactPhone));
-    if (c.contactEmail) keys.push('em:' + norm(c.contactEmail));
-    keys.forEach((k) => {
-      if (keyOwner.has(k)) union(keyOwner.get(k), c.id); else keyOwner.set(k, c.id);
-    });
-  });
-  const clusters = new Map();
-  clients.forEach((c) => {
-    const root = find(c.id);
-    if (!clusters.has(root)) clusters.set(root, []);
-    clusters.get(root).push(c);
-  });
-  const dups = [...clusters.values()].filter((g) => g.length > 1);
-  if (!dups.length) { openModal('去重检查', '<div class="batch-note">未发现重复客户（按公司名 / 电话 / 邮箱比对）</div>', { plain: true, noFooter: true }); return; }
-  const html = '<div class="batch-note danger-note">发现 <b>' + dups.length + '</b> 组疑似重复客户，请逐组确认处理（勾选要移除的记录，未勾选的保留）：</div>'
+  if (!window.ftwClientDedup) { toast('去重组件尚未加载，请刷新后重试'); return; }
+  const groups = window.ftwClientDedup.findGroups(clients);
+  const dups = groups.map(group => group.records.slice());
+  if (!dups.length) { openModal('去重检查', '<div class="batch-note">未发现疑似重复客户（名称已忽略大小写、空格及标点，并检查相近拼写）</div>', { plain: true, noFooter: true }); return; }
+  const html = '<div class="batch-note danger-note">发现 <b>' + dups.length + '</b> 组疑似重复客户。名称匹配已忽略大小写、空格及标点；相近拼写仅作核对线索，请检查匹配原因及联系方式后再处理（勾选要移除的记录，未勾选的保留）：</div>'
     + dups.map((g, gi) => {
       g.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       const rows = g.map((c, i) => `<div class="dedup-row keep">
@@ -2470,7 +2372,7 @@ function openClientDedup() {
           <b>${esc(c.company || '未命名')}</b>
           <span class="muted">${esc(c.country || '-')} · ${esc(clientOwnerLabel(c))} · ${esc(c.contactName||'')}<br>${esc(c.contactPhone||'无电话')} · ${esc(c.contactEmail||'无邮箱')}<br>登记：${esc(c.createdAt?new Date(c.createdAt).toLocaleDateString('zh-CN'):'未填写')}</span>
         </div>`).join('');
-      return `<div class="dedup-group">${rows}
+      return `<div class="dedup-group"><div class="batch-note"><strong>${groups[gi].type==='similar'?'名称相近 · 请核对':'信息匹配 · 请核对'}</strong><br>${groups[gi].reasons.map(esc).join(' · ')}</div>${rows}
         ${currentUser?.role==='admin'?`<label>合并后保留<select data-no-combo data-dedup-keep>${g.map(c=>`<option value="${esc(c.id)}">${esc(c.company)} · ${esc(clientOwnerLabel(c))} · ${esc(c.contactEmail||c.contactPhone||c.id)}</option>`).join('')}</select></label><button type="button" class="btn-mini" data-dedup-merge="${gi}">合并本组至所选客户</button>`:''}
         <button type="button" class="btn-mini btn-mini--danger" data-dedup-g="${gi}">移除本组勾选记录</button></div>`;
     }).join('');
@@ -2523,6 +2425,7 @@ function openAiClientAdvice(id) {
 }
 // AI 批量建议：选中客户优先，未选中则取当前列表前 10 个
 function currentClientList() {
+  if(window.crmClientRecords)return window.crmClientRecords();
   let list = filteredClientBase();
   if(clientFollowFilter)list=list.filter(c=>c.nextFollowUp&&c.nextFollowUp<=todayStr());
   if (clientStageFilter) list = list.filter((c) => phaseOf(c) === clientStageFilter);
@@ -2604,6 +2507,7 @@ function openAiFollowPlan() {
 })();
 
 function renderOrderBatchBar() {
+  if(window.crmSalesOrderBatch){window.crmSalesOrderBatch();return;}
   const n = orderSelected.size;
   const edit = document.getElementById('orderBatchEdit');
   if (edit) {
@@ -2735,7 +2639,7 @@ function openOrderBatchEdit() {
   const ids = [...orderSelected];
   if (!ids.length) { toast('请先勾选左侧复选框选择要修改的订单'); return; }
   const uOpts = assignableUsers().map((u) => '<option value="' + u.id + '">' + esc(u.name || u.username) + '</option>').join('');
-  const sOpts = ['待确认', '已确认', '生产中', '已发货', '已收款', '已完成', '已取消'].map((s) => '<option>' + s + '</option>').join('');
+  const sOpts = STATUSES.map((s) => '<option>' + s + '</option>').join('');
   openModal('批量编辑订单', ''
     + '<div class="batch-note">已选中 <b>' + ids.length + '</b> 笔订单，将统一修改下面选择的字段</div>'
     + '<div class="field"><label>修改字段</label><select id="bmField"><option value="status">订单状态</option><option value="owner">业务员</option></select></div>'
@@ -2797,7 +2701,7 @@ function openOrderBatchEdit() {
 }
 // 客户筛选：按国家 / 来源 / 等级 / 是否成交
 function clientHasOrder(c) {
-  return orders.some((o) => (o.clientName || '') === (c.company || '') && ['已收款', '已发货'].includes(o.status || ''));
+  return orders.some((o) => (window.CRMPrototype?CRMPrototype.matches(c,o):(o.clientName || '') === (c.company || '')) && FTWOrderWorkflow.isDeal(o));
 }
 function initClientFilters() {
   const cf = document.getElementById('cfCountry');
@@ -2870,14 +2774,20 @@ function backfillClientCreated() {
 function orderOwnerKey(o) {
   return o.owner ? 'id:' + String(o.owner) : o.ownerName ? 'name:' + o.ownerName.trim() : 'unassigned';
 }
-function orderSortDate(o){const s=String(o.orderDate||'').trim();const d=new Date(s+'T00:00:00Z');return /^\d{4}-\d{2}-\d{2}$/.test(s)&&!isNaN(d)&&d.toISOString().slice(0,10)===s?s:'';}
-function orderDateValue(o) {
-  if (String(o.orderDate || '').trim()) return String(o.orderDate).trim();
-  if (!o.createdAt) return '';
-  const d = new Date(o.createdAt);
-  return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// Display, default sorting and date filters must use the same day for every order status.
+function orderSortDate(o) {
+  const raw=String(o.orderDate||'').trim(),date=new Date(raw+'T00:00:00Z');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(date.getTime()) && date.toISOString().slice(0,10)===raw) return raw;
+  if (o.createdAt==null || o.createdAt==='') return '';
+  const value=o.createdAt;
+  const stamp=typeof value==='number'||/^\d+$/.test(String(value))?Number(value):Date.parse(value);
+  const created=new Date(stamp);
+  if (!Number.isFinite(stamp) || stamp<=0 || Number.isNaN(created.getTime())) return '';
+  return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(created);
 }
+function orderDateValue(o) { return orderSortDate(o); }
 function renderOrders() {
+  if(document.getElementById('live-sales-orders')){window.crmSalesRender?.('orders');return;}
   const ids=['orderStatusFilter','orderClientFilter','orderOwnerFilter','orderYearFilter','orderMonthFilter'];
   // Bind before the empty-result return, so filters always recover from zero matches.
   ids.forEach(id => { $('#'+id).onchange = renderOrders; });
@@ -2902,7 +2812,7 @@ function renderOrders() {
   }
   fillFilter('orderOwnerFilter','全部负责人',ownerOptions,fo);
   fillFilter('orderYearFilter','全部年份',[...new Set(orders.map(o=>orderDateValue(o).slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort().reverse().map(value=>({value,label:value+' 年'})),fy);
-  // 默认下单日期倒序，缺失日期放最后，同日按单号排序
+  // 按显示日期倒序（下单日期优先，缺失/无效时用创建日期）；完全无日期的最后，同日按单号排序。
   let list = orders.filter((o) => !f || o.status === f).sort((a,b)=>orderSortDate(b).localeCompare(orderSortDate(a))||byDocNo('orderNo')(a,b));
   if (fc) list = list.filter((o) => (o.clientName || '').trim() === fc);
   if (fo) list = list.filter(o => orderOwnerKey(o) === fo);
@@ -2910,14 +2820,22 @@ function renderOrders() {
   if (fm) list = list.filter(o => orderDateValue(o).slice(5,7) === fm);
 
   const okTotal = $('#okTotal'); if (okTotal) okTotal.textContent = list.length;
-  const okPending = $('#okPending'); if (okPending) okPending.textContent = list.filter((o) => o.status === '待确认').length;
-  const okShipped = $('#okShipped'); if (okShipped) okShipped.textContent = list.filter((o) => o.status === '已发货').length;
+  const okPending = $('#okPending'); if (okPending) okPending.textContent = list.filter(o => FTWOrderWorkflow.stage(o) === '待收预付款').length;
+  const okProducing = $('#okProducing'); if (okProducing) okProducing.textContent = list.filter(o => o.status === '生产中').length;
   const moneyTotal=rows=>{
     let sum=0;for(const o of rows){const amount=Number(o.amount)||0;const value=o.currency==='CNY'?amount:toCNY(amount,o.currency);if(value==null&&amount)return '汇率暂不可用';sum+=value||0;}return fmtMoney(sum);
   };
-  const okAmount=$('#okAmount');if(okAmount)okAmount.textContent=moneyTotal(list.filter(o=>['待确认','已确认','生产中','已发货'].includes(o.status)));
-  const paid=$('#okPaidAmount');if(paid)paid.textContent=moneyTotal(list.filter(o=>['已收款','已完成'].includes(o.status)));
-  const monthAmount=$('#okMonthAmount');if(monthAmount)monthAmount.textContent=moneyTotal(list.filter(o=>!['已取消','Cancelled'].includes(o.status)));
+  const active = list.filter(o => !FTWOrderWorkflow.isCancelled(o));
+  const payments = active.map(o => ({...o, payment:FTWOrderWorkflow.payment(o)}));
+  const known = payments.filter(o => o.payment.known);
+  $('#okAmount').textContent = moneyTotal(known.map(o => ({...o, amount:o.payment.outstanding})));
+  $('#okPaidAmount').textContent = moneyTotal(known.map(o => ({...o, amount:o.payment.received})));
+  $('#okAmount').closest('.stat-card').title = '按实际已付款比例计算剩余应收；未登记的生产及交付订单不推算余额';
+  $('#okMonthAmount').textContent = moneyTotal(active.filter(FTWOrderWorkflow.isDeal));
+  $('#okContractAmount').textContent = moneyTotal(active);
+  const unknown = payments.filter(o => !o.payment.known).length;
+  const legacy = payments.filter(o => o.payment.source === 'historical').length;
+  $('#orderPaymentNote').textContent = (unknown ? `${unknown} 笔收款资料未登记或金额无效，已计入符合阶段的成交金额，收款与余额待核对。` : '收款与余额按已登记付款比例计算；待收预付款且未登记付款的订单按未收款计算。') + (legacy ? ` ${legacy} 笔历史已收款 / 已完成订单未填付款比例，沿用原全额收款口径。` : '');
 
 
   const orderMeta = $('#orderMeta');
@@ -2936,8 +2854,8 @@ function renderOrders() {
       <td data-col="c3">${esc(o.country || '-')}</td>
       <td data-col="c4" class="amount text-right">${(Number(o.amount) || 0).toLocaleString()} ${esc(o.currency || '')}</td>
       <td data-col="c5" class="amount cny text-right">${cny != null ? fmtMoney(cny) : '—'}</td>
-      <td data-col="c6">${orderStatusTag(o.status)}</td>
-      <td data-col="c7" class="date">${esc(orderDate || '-')}</td>
+      <td data-col="c6">${orderStatusTag(o.status)}${!FTWOrderWorkflow.isCancelled(o)?`<small class="muted" style="display:block;margin-top:5px;white-space:nowrap">${FTWOrderWorkflow.payment(o).paidPercent==null?'收款待核对':'已收 '+FTWOrderWorkflow.payment(o).paidPercent+'%'}</small>`:''}</td>
+      <td data-col="c7" class="date" ${orderDate&&orderDate!==String(o.orderDate||'').trim()?'title="未填写有效下单日期，按创建日期显示与排序"':''}>${esc(orderDate || '-')}</td>
       <td data-col="c8" class="date">${esc(o.deliveryDate || '-')}</td>
       <td data-col="c9" class="text-center order-actions">
         <button class="action-btn" data-edit-o="${esc(o.id)}" title="编辑">
@@ -3022,7 +2940,9 @@ function checkModalScroll() {
   form.classList.toggle('can-scroll', form.scrollHeight > form.clientHeight + 2);
 }
 
+let modalCloseTimer;
 function openModal(title, html, opts = {}) {
+  clearTimeout(modalCloseTimer);
   document.dispatchEvent(new Event('ftw:modal-replace'));
   resetModalDrag();
   $('#modalTitle').textContent = title;
@@ -3049,7 +2969,8 @@ function closeModal() {
   document.dispatchEvent(new Event('ftw:modal-close'));
   resetModalDrag();
   modal.classList.remove('showing');
-  setTimeout(() => { modal.classList.remove('open'); }, 250);
+  clearTimeout(modalCloseTimer);
+  modalCloseTimer = setTimeout(() => { modal.classList.remove('open'); }, 250);
 }
 $('#modalClose').onclick = closeModal;
 let modalBackdropStart=null;
@@ -3423,7 +3344,7 @@ function openOrderModal(id, prefill) {
     ${field('国家', 'country', o.country)}
     ${field('金额', 'amount', o.amount, 'number', 'step="0.01"')}
     ${selectField('币种', 'currency', o.currency || 'USD', CURRENCIES)}
-    ${selectField('状态', 'status', o.status || '待确认', STATUSES)}
+    ${selectField('状态', 'status', o.status || '待确认', STATUSES.includes(o.status)||!o.status?STATUSES:[...STATUSES,o.status])}
     ${selectField('商机阶段', 'stage', o.stage || '初步接触', OPPTY_STAGES)}
     ${field('成交概率(%)', 'probability', o.probability != null ? o.probability : 20, 'number', 'min="0" max="100"')}
     ${field('下单日期', 'orderDate', o.orderDate, 'date')}
@@ -3539,7 +3460,7 @@ function openClientDetail(id) {
   const timeline = [
     ...myInqs.map((x) => ({ date: x.receivedAt || '', type: '询盘', title: x.product || '新询盘', meta: x.status || '' })),
     ...myQuotes.map((x) => ({ date: x.validUntil || (x.createdAt ? new Date(x.createdAt).toISOString().slice(0, 10) : ''), type: '报价', title: (x.quoteNo || '报价') + ' · ' + (x.projectName || ''), meta: (x.status || '草稿') + ' · ' + qtTotalOf(x).toLocaleString() + ' ' + (x.currency || 'USD') })),
-    ...myOrders.map((x) => ({ date: x.orderDate || (x.createdAt ? new Date(x.createdAt).toISOString().slice(0, 10) : ''), type: '订单', title: x.orderNo || '订单', meta: x.status || '' })), 
+    ...myOrders.map((x) => ({ date: x.orderDate || (x.createdAt ? new Date(x.createdAt).toISOString().slice(0, 10) : ''), type: '订单', title: x.orderNo || '订单', meta: x.status || '' })),
     ...myComms.map((x) => ({ date: x.date || '', type: x.channel || '沟通', title: x.summary || '沟通记录', meta: (x.content || '').slice(0, 80) })),
     ...myChats.map((x) => ({ date: fmtDateShort(x.createdAt), type: '聊天', title: x.title || '聊天记录', meta: (x.raw || '').slice(0, 80) })),
   ].filter((x) => x.date).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 20);
@@ -3557,7 +3478,7 @@ function openClientDetail(id) {
       </tr>`).join('')}</tbody>
     </table>` : '<div class="muted">暂无订单</div>';
   // 派生字段：创建日期 / 上次成交 / 累计成交金额 / 当前联系人职位
-  const myDealOrders = myOrders.filter((o) => ['已收款', '已发货'].includes(o.status || ''));
+  const myDealOrders = myOrders.filter((o) => FTWOrderWorkflow.isDeal(o));
   const cumCNY = myDealOrders.reduce((s, o) => s + (toCNY(Number(o.amount) || 0, o.currency) || 0), 0);
   const dealDates = myDealOrders.map((o) => o.orderDate || o.deliveryDate || (o.createdAt ? new Date(o.createdAt).toISOString().slice(0, 10) : '')).filter(Boolean).sort();
   const lastDeal = dealDates.length ? dealDates[dealDates.length - 1] : '-';
@@ -3587,7 +3508,7 @@ function openClientDetail(id) {
         <div class="cd-row"><span>下次跟进</span><b>${esc(c.nextFollowUp || '-')}</b></div>
         <div class="cd-row"><span>创建日期</span><b>${esc(createdAtStr)}</b></div>
         <div class="cd-row"><span>上次成交</span><b>${esc(lastDeal)}</b></div>
-        <div class="cd-row"><span title="已收款、已发货订单按汇率折合人民币汇总">累计采购额（CNY）</span><b>${fmtMoney(cumCNY)}</b></div>
+        <div class="cd-row"><span title="生产中及后续阶段订单全额计入成交，取消订单不计入">累计采购额（CNY）</span><b>${fmtMoney(cumCNY)}</b></div>
         <div class="cd-row"><span>当前联系人</span><b>${esc(contactNameTitle)}</b></div>
       </div>
       <div class="cd-impression">
@@ -3789,6 +3710,8 @@ async function boot() {
 }
 
 function showLogin(message = '') {
+  const loginButton = document.querySelector('#loginForm [type=submit]');
+  if (loginButton) { loginButton.disabled = false; loginButton.textContent = '登 录'; }
   window.__ftwNoticeUser = null;
   document.dispatchEvent(new Event('ftw:session-change'));
   $('#loginOverlay').classList.remove('hidden');
@@ -3832,7 +3755,7 @@ function showLogin(message = '') {
   };
 }
 
-const safe = (fn) => { try { if (fn) fn(); } catch (e) { console.error('module loader', e); } };
+const safe = (fn) => { try { if (fn) Promise.resolve(fn()).catch(e => console.error('module loader', e)); } catch (e) { console.error('module loader', e); } };
 
 async function enterApp() {
   // 每个步骤独立容错：任一模块加载/渲染失败都绝不影响其它模块，也不会闪退回登录页
@@ -3862,7 +3785,7 @@ async function enterApp() {
   // 按地址栏 hash 激活对应页面（支持刷新后停留在原页面 / 收藏直达）
   // 不预设 dashLastReload：这样落在首页时会真的重新拉一次数据，而不是只重绘内存里的旧数据
   dashLastReload = 0;
-  activateView(location.hash.replace(/^#\/?/, '') || 'dashboard');
+  activateView(location.hash.replace(/^#\/?/, '') || 'dashboard', true);
 }
 
 async function loadUsers() {
@@ -4190,6 +4113,9 @@ function openUserMgmt(keepOpen) {
 (function initTableSort() {
   // 表头文本含这些词的列不参与排序（操作/批量按钮列）
   const SKIP_HEAD = ['操作', '选择'];
+  // 本脚本自己的排序状态只会是 asc / desc。订单、报价、客户等页面的表头也用 data-sort 存排序字段名（如 no、date），
+  // 若按属性是否存在来判断，刷新后会把这些表误当成「按单号倒序」重新排一遍，覆盖页面自己的默认排序。
+  const SORTED_TH = 'thead th[data-sort="asc"], thead th[data-sort="desc"]';
   // 表头含交互控件的列不参与排序（如全选 checkbox）
   const isSortableTh = (th) => {
     if (!th || th.querySelector('input,button,select')) return false;
@@ -4232,7 +4158,7 @@ function openUserMgmt(keepOpen) {
     // 表头含「单号」的列按单号规则比较（与列表默认排序保持一致）
     const isDocNo = /单号/.test((th.textContent || '').trim());
     // 清除本表所有列的排序状态
-    table.querySelectorAll('thead th[data-sort]').forEach((x) => { delete x.dataset.sort; x.classList.remove('sort-asc', 'sort-desc'); });
+    table.querySelectorAll(SORTED_TH).forEach((x) => { delete x.dataset.sort; x.classList.remove('sort-asc', 'sort-desc'); });
     if (!dir) return;
     th.dataset.sort = dir;
     th.classList.toggle('sort-asc', dir === 'asc');
@@ -4245,6 +4171,7 @@ function openUserMgmt(keepOpen) {
     const keyed = rows.map((r) => ({ r, si: Number(r.dataset.si) || 0, v: cellValue(r.cells[idx], isDocNo) }));
     keyed.sort((a, b) => {
       const c = cmp(a.v, b.v);
+      if (tbody.id==='orderBody' && th.dataset.col==='c7' && (a.v.type==='empty'||b.v.type==='empty')) return c;
       if (c !== 0) return dir === 'asc' ? c : -c;
       return a.si - b.si; // 稳定：同值保持原相对顺序
     });
@@ -4270,6 +4197,7 @@ function openUserMgmt(keepOpen) {
     applySort(table, th, next);
     if (!next) { // 恢复原始顺序
       const tbody = table.tBodies[0];
+      if (tbody?.id==='orderBody') { delete tbody.dataset.origOrder; renderOrders(); return; }
       if (tbody) {
         const rows = Array.from(tbody.rows);
         rows.forEach((r) => { if (r.dataset.si == null) r.dataset.si = 0; });
@@ -4298,7 +4226,7 @@ function openUserMgmt(keepOpen) {
     clearTimeout(reapplyTimer);
     reapplyTimer = setTimeout(() => {
       document.querySelectorAll('table.data-table').forEach((table) => {
-        const active = table.querySelector('thead th[data-sort]');
+        const active = table.querySelector(SORTED_TH);
         if (active && table.tBodies[0] && table.tBodies[0].rows.length) applySort(table, active, active.dataset.sort);
       });
     }, 60);
@@ -4371,7 +4299,8 @@ function openUserMgmt(keepOpen) {
         if (!cfg.labelKeys) cfg.labelKeys=Object.fromEntries(Object.entries(cfg.labels||{}).map(([i,v])=>[oldKeys[i],v]).filter(([k])=>k));
         if (!cfg.orderKeys && cfg.order) cfg.orderKeys=cfg.order.map(i=>oldKeys[i]).filter(Boolean);
       }
-      if(key==='clientBody' && !cfg)return {hiddenKeys:['phone','prod','comm','health','ai','created','source'],labelKeys:{}};
+      if(key==='clientBody' && !cfg && document.querySelector('#crm-clients'))return {hiddenKeys:[],labelKeys:{}};
+      if(key==='clientBody' && !cfg)return {hiddenKeys:['contact','phone','prod','comm','health','ai','created','source'],labelKeys:{}};
       return cfg;
     } catch { return null; }
   }
@@ -4489,6 +4418,9 @@ function openUserMgmt(keepOpen) {
     if (isClientTable(table)) { try { clSyncColgroupIfVisChanged(table); } catch (e) { console.warn('clSyncColgroupIfVisChanged', e); } }
   }
 
+  // Keep freshly rendered rows and headers in the same visible column schema.
+  window.applyClientTableColumns = () => { const table=document.querySelector('.cl-table'); if(table)applyCols(table); };
+
   // 保存配置：除客户表外，其它表同样把「第几列」翻译成稳定 key，
   // 这样调过列顺序之后再隐藏列 / 改表头名也不会跟错列；同时同步到服务端（同账号跨设备生效）
   function persistCfg(table, cfg) {
@@ -4514,30 +4446,37 @@ function openUserMgmt(keepOpen) {
     try { saveUiPref({ tableCols: JSON.parse(localStorage.getItem('ftw_table_cols_v1') || '{}') }); } catch (e) {}
   }
 
+  const columnButtons = new Map();
+
   // 列设置统一放在表格外；已有固定工具栏按钮的客户、订单列表继续复用。
   function injectBtn(table) {
     const wrap = table.closest('.table-wrap');
     if (!wrap) return;
-    if (table.tBodies[0] && ['clientBody','orderBody'].includes(table.tBodies[0].id)) return;
+    if (table.tBodies[0] && ['clientBody','orderBody','qtBody','pfDealBody'].includes(table.tBodies[0].id)) return;
     let tools = table.dataset.columnToolbar && document.querySelector(table.dataset.columnToolbar);
     if (!tools || wrap.contains(tools)) {
       tools = wrap.__columnTools;
       if (!tools?.isConnected) {
         tools = document.createElement('div');
         tools.className = 'table-column-tools';
+        tools.dataset.autoColumnTools = '';
         wrap.before(tools); wrap.__columnTools = tools;
       }
     }
-    let btn = table.__columnButton;
+    let btn = columnButtons.get(table);
     if (!btn) {
       btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'col-cfg-btn btn-ghost btn-mini';
       btn.title = '列设置：显示/隐藏列、自定义表头';
       btn.textContent = '列设置';
-      btn.addEventListener('click', (e) => { e.stopPropagation(); openColCfg(table); });
-      table.__columnButton = btn;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (table.isConnected) openColCfg(table);
+      });
+      columnButtons.set(table, btn);
     }
     if (btn.parentElement !== tools) tools.appendChild(btn);
+    return btn;
   }
 
   // 供页面工具栏按钮调用（按 tbody id 定位表格）
@@ -4666,8 +4605,21 @@ function openUserMgmt(keepOpen) {
     }
   }
 
+  // Dynamic analytics rows apply saved columns before becoming visible.
+  window.applyTableColumnSettings=table=>{if(table)applyCols(table);};
+
   function scanAll() {
-    document.querySelectorAll('table.data-table').forEach((t) => { injectBtn(t); applyCols(t); });
+    const staleTables = new Set(columnButtons.keys());
+    document.querySelectorAll('table.data-table').forEach((table) => {
+      if (injectBtn(table)) staleTables.delete(table);
+      applyCols(table);
+    });
+    // 动态表格可能重建在同一个容器里，清掉原表格留在外面的按钮。
+    for (const table of staleTables) {
+      columnButtons.get(table).remove();
+      columnButtons.delete(table);
+    }
+    document.querySelectorAll('[data-auto-column-tools]:empty').forEach(tools => tools.remove());
   }
   scanAll();
   let timer = null;

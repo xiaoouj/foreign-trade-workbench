@@ -15,14 +15,24 @@ let quotations = [];
 let qtSearchQ = '';
 let qtFilterStatus = '';
 
-const getAllQuotations = () => quotations;
+const getAllQuotations = () => window.__crmQuoteDataOwner===currentUser?.id?quotations:[];
 window.getAllQuotations = getAllQuotations;
 
 async function loadQuotations() {
+  const actor=currentUser?.id;
+  window.crmSalesFeedback?.('quotes','pending');
   try {
-    const r = await api('/api/quotations');
-    if (r.ok) quotations = await r.json();
-  } catch (e) { console.error('loadQuotations', e); quotations = []; }
+    await ftwDashLoad('quotes', async () => {
+      const r = await api('/api/quotations');
+      if (!r.ok) throw new Error('报价加载失败');
+      const data = await r.json();
+      if (!Array.isArray(data)) throw new Error('报价数据格式异常');
+      if(actor!==currentUser?.id)return;
+      quotations = data;window.__crmQuoteDataOwner=actor;
+    });
+    if(actor===currentUser?.id)window.crmSalesFeedback?.('quotes','ready');
+  } catch (e) { if(actor===currentUser?.id)window.crmSalesFeedback?.('quotes','error');console.error('loadQuotations', e); }
+  if(actor!==currentUser?.id)return;
   renderQuotations();
   window.dispatchEvent(new Event('ftw:quotationsChanged'));
 }
@@ -50,12 +60,13 @@ function qtCreatedDate(value){
  if(isNaN(d))return '—';
  return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
 }
-function qtInlineStatus(q){return `<select class="qt-inline-status" data-no-combo data-qt-status-edit="${esc(q.id)}" aria-label="${esc(q.quoteNo||'报价')} 状态">${QT_STATUSES.map(st=>`<option value="${esc(st)}" ${st===(q.status||'草稿')?'selected':''}>${esc(st)}</option>`).join('')}</select>`;}
+function qtInlineStatus(q){return `<select class="qt-inline-status" ${qtConverting.has(q.id)?'disabled':''} data-no-combo data-qt-status-edit="${esc(q.id)}" aria-label="${esc(q.quoteNo||'报价')} 状态">${QT_STATUSES.map(st=>`<option value="${esc(st)}" ${st===(q.status||'草稿')?'selected':''}>${esc(st)}</option>`).join('')}</select>`;}
 async function saveQtInlineStatus(select){
  const q=quotations.find(q=>q.id===select.dataset.qtStatusEdit);if(!q)return;
  const previous=q.status||'草稿',status=select.value;if(status===previous)return;
  select.disabled=true;
  try{
+  if(status==='已转订单'){select.value=previous;await convertQuoteToOrder(q.id);select.value=q.status||previous;return;}
   const response=await api('/api/quotations/'+encodeURIComponent(q.id),{method:'PUT',body:JSON.stringify({status,baseVersion:q.version||1})});
   const result=await response.json().catch(()=>({}));if(!response.ok)throw Error(result.error||'状态保存失败');
   Object.assign(q,result);renderQuotations();window.dispatchEvent(new Event('ftw:quotationsChanged'));toast('报价状态已更新');
@@ -67,6 +78,7 @@ let qtPageSize = (()=>{try{const size=Number(localStorage.getItem('ftw.qtPageSiz
 
 let qtSelectedId = null;
 function renderQuotations() {
+  if(document.getElementById('live-sales-quotes')){window.crmSalesRender?.('quotes');return;}
   const body=$('#qtBody');if(!body)return;
   const now=todayStr(), month=now.slice(0,7),soon=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
   $('#qkMonth').textContent=quotations.filter(q=>q.createdAt&&new Date(q.createdAt).toISOString().slice(0,7)===month).length;
@@ -99,7 +111,7 @@ function quoteItemsTable(q){return `<div class="sales-item-scroll"><table><thead
 function renderQuoteSelected(){
   const q=quotations.find(q=>q.id===qtSelectedId),host=$('#qtSelectedDetail');if(!q){host.innerHTML='';return;}
   const history=Array.isArray(q.revisionHistory)?q.revisionHistory:[],client=clients.find(c=>c.id===q.clientId||c.company===q.clientName);
-  host.innerHTML=`<div class="sales-quote-detail"><section class="sales-card sales-quote-overview"><h3>${esc(q.quoteNo||'未填写')} ${qtStatusBadge(q.status)}</h3><dl class="sales-info"><dt>客户</dt><dd>${esc(q.clientName||'—')}</dd><dt>邮箱</dt><dd>${esc(client?.contactEmail||'未填写')}</dd><dt>贸易条款</dt><dd>${esc(q.tradeTerms||'未填写')}</dd><dt>付款条款</dt><dd>${esc(q.paymentTerms||'未填写')}</dd><dt>定金比例</dt><dd>${q.depositPercent==null?'未设置':q.depositPercent+'%'}</dd><dt>交货期</dt><dd>${q.deliveryDays?esc(q.deliveryDays)+' 天':'未填写'}</dd></dl><p class="sales-quote-note">${esc(q.notes||'暂无备注')}</p></section><section class="sales-card sales-quote-products"><h3>产品明细 <span class="muted">${(q.items||[]).length} 项</span></h3>${quoteItemsTable(q)}<div class="sales-total">合计 <strong>${salesMoney(qtTotal(q.items),q.currency)}</strong></div></section><section class="sales-card sales-quote-history"><h3>修改节点 <span class="sales-round">${Math.max(0,(Number(q.version)||1)-1)} 轮 · V${Number(q.version)||1}</span></h3><p class="muted">内容实际变更时记录；状态切换不增加轮次。</p><ol>${history.slice().reverse().map((node,i)=>`<li><span class="sales-history-dot"></span><div><b>${node.kind==='created'?'初始报价':node.kind==='baseline'?'历史版本起点':'第 '+(node.version-1)+' 轮修改'} · V${esc(node.version)}</b><small>${esc(new Date(node.at).toLocaleString('zh-CN',{hour12:false}))} · ${esc(node.userName||'—')}</small><p>${esc((node.changes||[]).join('、'))}</p><button class="sales-link" data-qt-revision="${history.length-1-i}">查看此版内容</button></div></li>`).join('')||`<li><div><b>历史报价 V${Number(q.version)||1}</b><p>原版本号已保留；详细修改节点从本次升级后开始记录。</p></div></li>`}</ol></section></div><div class="sales-detail-actions"><button class="btn-ghost" id="qtDetailEdit">编辑报价</button><button class="btn-ghost" id="qtDetailDoc">预览 / 导出 PDF</button><button class="btn-ghost" id="qtDetailCopy">复制报价</button><button class="btn-primary" id="qtDetailOrder" ${q.status!=='客户确认'?'disabled':''} title="客户确认后可转订单">转为订单</button></div>`;
+  host.innerHTML=`<div class="sales-quote-detail"><section class="sales-card sales-quote-overview"><h3>${esc(q.quoteNo||'未填写')} ${qtStatusBadge(q.status)}</h3><dl class="sales-info"><dt>客户</dt><dd>${esc(q.clientName||'—')}</dd><dt>邮箱</dt><dd>${esc(client?.contactEmail||'未填写')}</dd><dt>贸易条款</dt><dd>${esc(q.tradeTerms||'未填写')}</dd><dt>付款条款</dt><dd>${esc(q.paymentTerms||'未填写')}</dd><dt>定金比例</dt><dd>${q.depositPercent==null?'未设置':q.depositPercent+'%'}</dd><dt>交货期</dt><dd>${q.deliveryDays?esc(q.deliveryDays)+' 天':'未填写'}</dd></dl><p class="sales-quote-note">${esc(q.notes||'暂无备注')}</p></section><section class="sales-card sales-quote-products"><h3>产品明细 <span class="muted">${(q.items||[]).length} 项</span></h3>${quoteItemsTable(q)}<div class="sales-total">合计 <strong>${salesMoney(qtTotal(q.items),q.currency)}</strong></div></section><section class="sales-card sales-quote-history"><h3>修改节点 <span class="sales-round">${Math.max(0,(Number(q.version)||1)-1)} 轮 · V${Number(q.version)||1}</span></h3><p class="muted">内容实际变更时记录；状态切换不增加轮次。</p><ol>${history.slice().reverse().map((node,i)=>`<li><span class="sales-history-dot"></span><div><b>${node.kind==='created'?'初始报价':node.kind==='baseline'?'历史版本起点':'第 '+(node.version-1)+' 轮修改'} · V${esc(node.version)}</b><small>${esc(new Date(node.at).toLocaleString('zh-CN',{hour12:false}))} · ${esc(node.userName||'—')}</small><p>${esc((node.changes||[]).join('、'))}</p><button class="sales-link" data-qt-revision="${history.length-1-i}">查看此版内容</button></div></li>`).join('')||`<li><div><b>历史报价 V${Number(q.version)||1}</b><p>原版本号已保留；详细修改节点从本次升级后开始记录。</p></div></li>`}</ol></section></div><div class="sales-detail-actions"><button class="btn-ghost" id="qtDetailEdit">编辑报价</button><button class="btn-ghost" id="qtDetailDoc">预览 / 导出 PDF</button><button class="btn-ghost" id="qtDetailCopy">复制报价</button><button class="btn-primary" id="qtDetailOrder" ${qtConverting.has(q.id)||q.orderId||!['客户确认','已转订单'].includes(q.status)?'disabled':''} title="${q.orderId?'此报价已关联订单':q.status==='已转订单'?'补建并关联真实订单':'客户确认后可转订单'}">${q.orderId?'已关联订单':q.status==='已转订单'?'补建订单':'转为订单'}</button></div>`;
   $('#qtDetailEdit').onclick=()=>openQuoteModal(q.id);$('#qtDetailDoc').onclick=()=>openQuoteDoc(q.id);
   $('#qtDetailCopy').onclick=()=>openQuoteModal(null,{...q,id:undefined,quoteNo:suggestQuoteNo(),status:'草稿',orderId:null});
   $('#qtDetailOrder').onclick=()=>convertQuoteToOrder(q.id);
@@ -149,7 +161,7 @@ function openQuoteModal(id, prefill) {
   const knownClient = clients.find(c => c.id === q.clientId && companyKey(c.company) === companyKey(q.clientName)) || clients.find(c => companyKey(c.company) === companyKey(q.clientName));
   const clientOpts = ['<option value="">— 选择客户 —</option>', ...(q.clientName && !knownClient ? [`<option value="${esc(q.clientName)}" selected>${esc(q.clientName)}（未建档）</option>`] : []), ...clients.map((c) => `<option value="${esc(c.company)}" ${c.id === knownClient?.id ? 'selected' : ''}>${esc(c.company)}</option>`)].join('');
   const curOpts = CURRENCIES.map((c) => `<option ${c === (q.currency || 'USD') ? 'selected' : ''}>${c}</option>`).join('');
-  const statusOpts = QT_STATUSES.map((s) => `<option ${s === (q.status || '草稿') ? 'selected' : ''}>${s}</option>`).join('');
+  const statusOpts = QT_STATUSES.filter(s=>s!=='已转订单'||q.status==='已转订单').map((s) => `<option ${s==='已转订单'?'disabled':''} ${s === (q.status || '草稿') ? 'selected' : ''}>${s}</option>`).join('');
   const users = window.assignableUsers();
   const ownerDef = q.owner || (typeof currentUser !== 'undefined' && currentUser ? currentUser.id : '');
   const ownerSel = ['<option value="">— 默认本人 —</option>',
@@ -426,41 +438,38 @@ function createQuoteFromInquiry(inq) {
 }
 window.createQuoteFromInquiry = createQuoteFromInquiry;
 
-// 报价确认后转订单
+// All conversion entries share confirmation and one transactional API. Pending requests cannot repeat.
+const qtConverting = new Set();
 async function convertQuoteToOrder(qid) {
-  const q = quotations.find((x) => x.id === qid);
+  const q = quotations.find(x => x.id === qid);
   if (!q) return toast('报价单不存在');
-  if (q.status !== '客户确认') return toast('只有「客户确认」的报价单才能转订单');
-  const linked = clients.find((c) => c.id === q.clientId || c.company === q.clientName);
-  if (!await orderItemsReady()) return;
-  const orderNo = String(q.quoteNo || '').trim();
-  if (!orderNo) return toast('请先填写报价单号，再转订单');
-  const body = {
-    orderNo,
-    clientName: q.clientName || '',
-    clientId: linked ? linked.id : (q.clientId || null),
-    country: linked ? linked.country : '',
-    amount: qtTotal(q.items),
-    currency: q.currency || 'USD',
-    status: '待确认',
-    paymentTerms: q.paymentTerms || '',
-    depositPercent:q.depositPercent??null,
-    deliveryDate: q.deliveryDays ? futureDate(q.deliveryDays) : '',
-    notes: `由报价单 ${q.quoteNo} (V${q.version || 1}) 转化\n${q.notes || ''}`,
-    owner: q.owner || (currentUser ? currentUser.id : ''),
-    ownerName: q.ownerName || (currentUser ? currentUser.name : ''),
-    quoteId: q.id,
-    inquiryId:q.inquiryId||null,
-    items: JSON.parse(JSON.stringify(q.items || [])),
-  };
-  const r = await api('/api/orders', { method: 'POST', body: JSON.stringify(body) });
-  if (!r.ok) { const j = await r.json().catch(() => ({})); toast('转订单失败：' + (j.error || r.status)); return; }
-  const order = await r.json();
-  const qr = await api('/api/quotations/' + q.id, { method: 'PUT', body: JSON.stringify({ status: '已转订单', orderId: order.id }) });
-  if (!qr.ok) { console.error('更新报价单状态失败', qr.status); }
-  toast('已生成订单：' + orderNo);
-  loadQuotations();
-  if (typeof loadAll === 'function') loadAll();
+  if (qtConverting.has(qid)) return;
+  const message = q.orderId
+    ? `报价 ${q.quoteNo||''} 已有关联订单，确认核对并恢复“已转订单”状态？`
+    : `确认将报价 ${q.quoteNo||''} 转为订单？将创建一笔待确认订单并关联报价。${q.status!=='客户确认'?'当前报价尚未标记为客户确认，请核对客户意向。':''}`;
+  if (!confirm(message)) return;
+  qtConverting.add(qid);
+  const button = $('#qtDetailOrder');
+  if (button && qtSelectedId === qid) button.disabled = true;
+  try {
+    const response = await api('/api/quotations/'+encodeURIComponent(qid)+'/convert-to-order', {
+      method:'POST',body:JSON.stringify({baseVersion:q.version||1}),
+    });
+    const result = await response.json().catch(()=>({}));
+    if (!response.ok) throw Error(result.error||'转订单失败，请重试');
+    Object.assign(q,result.quotation);
+    renderQuotations();window.dispatchEvent(new Event('ftw:quotationsChanged'));
+    toast((result.created?'已生成订单：':'已关联已有订单：')+result.order.orderNo);
+    await loadQuotations();
+    if (typeof loadAll==='function') await loadAll();
+    return result.order;
+  } catch (error) {
+    toast('转订单失败：'+error.message);
+  } finally {
+    qtConverting.delete(qid);
+    // The list may have re-rendered while this request was in flight.
+    renderQuotations();
+  }
 }
 window.convertQuoteToOrder = convertQuoteToOrder;
 

@@ -32,12 +32,15 @@ function bindComms() {
 }
 
 async function loadComms() {
+  const actor=currentUser?.id;
   try {
     const [c, t] = await Promise.all([api('/api/comms').then((r) => r.json()), api('/api/comm-templates').then((r) => r.json())]);
-    comms = c || []; commTmpl = t || [];
-  } catch { comms = []; commTmpl = []; }
+    if(actor!==currentUser?.id)return;
+    comms = c || []; commTmpl = t || [];window.__crmCommDataOwner=actor;
+  } catch { if(actor===currentUser?.id){comms = []; commTmpl = [];} }
+  if(actor!==currentUser?.id)return;
   bindComms();
-  renderComms();
+  renderComms();window.dispatchEvent(new Event('ftw:commsChanged'));
 }
 
 function filterComms() {

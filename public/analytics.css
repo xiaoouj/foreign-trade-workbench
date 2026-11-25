@@ -22,3 +22,77 @@
 @media(max-width:900px){#view-performance .dash-grid { grid-template-columns:1fr; }.analytics-months { grid-template-columns:repeat(2,minmax(0,1fr)); }}
 #pfRing { display:block; }
 #pfRing .analytics-progress { width:100%; }
+
+#view-performance .perf-goal-panel,
+#view-performance .perf-team-panel,
+#view-performance .perf-monthly-panel { margin-bottom: 18px; }
+#view-performance .perf-goal-panel { padding: 10px 16px; }
+#view-performance .perf-goal-panel #pfRing {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 0;
+}
+#view-performance .perf-goal-panel #pfRing strong { margin: 0; font-size: 14px; white-space: nowrap; }
+#view-performance .perf-goal-panel #pfRingLabel { padding: 4px 0 0; text-align: left; }
+#view-performance #pfTeam[hidden], #view-performance #pfStatusWeek[hidden] { display: none; }
+#view-performance .perf-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+#view-performance .perf-section-heading .muted { font-size: 12px; }
+.perf-team-scroll { overflow-x: auto; }
+.perf-team-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.perf-team-table :is(th, td) { padding: 11px 14px; overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
+.perf-team-table tr:last-child > * { border-bottom: 0; }
+.perf-team-table thead th { background: var(--bg-2); color: var(--ink-soft); font-size: 12px; }
+.perf-team-table :is(th, td):first-child { text-align: left; }
+.perf-team-table :is(th, td):not(:first-child) { text-align: right; }
+.perf-team-table td small { display: block; font-size: 11px; color: var(--ink-soft); }
+.perf-team-table .perf-achieved { color: var(--ok); }
+.perf-team-meter { height: 4px; max-width: 72px; margin: 5px 0 0 auto; border-radius: 4px; overflow: hidden; background: var(--line); }
+.perf-team-meter i { height: 100%; display: block; background: var(--brand); }
+#view-performance .perf-chart-grid.perf-focus-row { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; }
+#view-performance :is(#pfClientChart,#pfStatus) { min-height: 0; padding: 12px 16px; }
+.perf-client-rank, .perf-status-list { list-style: none; margin: 0; padding: 0; }
+.perf-client-rank li {
+  display: grid;
+  grid-template-columns: 22px minmax(0,1fr) max-content;
+  column-gap: 8px;
+  row-gap: 5px;
+  align-items: baseline;
+  padding: 7px 0;
+}
+.perf-rank-number { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.perf-rank-client { min-width: 0; overflow-wrap: anywhere; }
+.perf-client-rank strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.perf-rank-track { grid-column: 2 / -1; height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.perf-rank-track i { display: block; height: 100%; background: var(--brand); }
+#pfStatusWeek { max-width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; }
+.perf-status-total { display: flex; gap: 8px; align-items: baseline; color: var(--ink-soft); font-size: 12px; }
+.perf-status-total strong { color: var(--ink); font-size: 24px; }
+.perf-status-stack { display: flex; height: 9px; overflow: hidden; border-radius: 6px; margin: 7px 0 8px; }
+.perf-status-stack span { flex: none; }
+.perf-status-list li { display: grid; grid-template-columns: 8px minmax(0,1fr) auto 55px; align-items: center; gap: 8px; padding: 7px 0; }
+.perf-status-list i { width: 8px; height: 8px; border-radius: 50%; }
+.perf-status-list small { text-align: right; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+#pfMonthlyChart .perf-svg { min-width: 550px; }
+#pfMonthlyChart .perf-svg .perf-bar-value {
+  fill: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+@media(max-width:1100px) {
+  #view-performance .perf-chart-grid.perf-focus-row { grid-template-columns: minmax(0,1fr); }
+}
+@media(max-width:800px) {
+  html body #view-performance .stats.stats-4 { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  html body #view-performance .stats-4 .stat-card { padding: 14px; gap: 6px; }
+}
+@media(max-width:600px) {
+  .perf-team-table :is(th, td) { padding: 9px 6px; font-size: 12px; }
+  #view-performance :is(.perf-section-heading,#pfClientChart,#pfStatus) { padding: 10px 12px; }
+}

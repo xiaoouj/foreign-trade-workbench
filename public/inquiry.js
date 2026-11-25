@@ -73,6 +73,7 @@ function renderInqFilterBar() {
 
 // 子页签切换（限定在询盘视图内，避免误触任务/沟通等其他模块的同名页签）
 $$('#view-enquiry .subtab').forEach((b) => b.addEventListener('click', () => {
+  if(window.crmSetInquiryView){window.crmSetInquiryView(b.dataset.subtab);return;}
   $$('#view-enquiry .subtab').forEach((x) => x.classList.remove('active'));
   $$('#view-enquiry .subview').forEach((x) => x.classList.remove('active'));
   b.classList.add('active');
@@ -104,89 +105,30 @@ async function loadInqSources() {
 
 // 看板 / 列表加载
 async function loadInquiries() {
+  const actor=currentUser?.id;
+  if(typeof setInqWorkspaceLoadState==='function')setInqWorkspaceLoadState('pending');
+  try{return await ftwDashLoad('inquiries', async () => {
   const [a, b] = await Promise.all([
-    api('/api/inquiries').then((r) => r.json()),
+    api('/api/inquiries').then(async r => { if (!r.ok) throw new Error('询盘加载失败'); const data=await r.json(); if(!Array.isArray(data))throw new Error('询盘数据格式异常'); return data; }),
     api('/api/exceptions').then((r) => r.json()),
   ]);
-  inquiries = a || []; exceptions = b || [];
+  if(actor!==currentUser?.id)return;
+  inquiries = a || []; exceptions = b || [];window.__crmInquiryDataOwner=actor;
   await loadInqSources(); // 每次打开询盘页都刷新来源列表
   renderInqBoard(); renderInqList(); renderInqStats();
   // 通知业绩等依赖询盘状态的模块实时刷新（漏斗/金额）
   window.dispatchEvent(new Event('ftw:inquiriesChanged'));
+  if(typeof setInqWorkspaceLoadState==='function')setInqWorkspaceLoadState('ready');
+  });}catch(error){if(actor===currentUser?.id&&typeof setInqWorkspaceLoadState==='function')setInqWorkspaceLoadState('error');throw error;}
 }
 
 // -------- 询盘看板（按状态分列，拖拽改状态） --------
-function renderInqBoard() {
-  const wrap = $('#inqBoard');
-  renderInqFilterBar();
-  const filtered = inqSearch(inqFilteredAll(inquiries));
-  const cols = INQ_STATUSES.map((st) => {
-    const items = filtered.filter((q) => (q.status || '新询盘') === st)
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    return `
-      <div class="kanban-col" data-status="${st}">
-        <div class="kanban-col-head">
-          <span class="lh" style="font-weight:600;color:var(--ink-soft)">${st}</span>
-          <span class="count">${items.length}</span>
-        </div>
-        <div class="kanban-cards" data-status="${st}">
-        ${items.length === 0 ? '<div class="empty" style="padding:14px">—</div>' : items.map(cardHtml).join('')}
-        </div>
-      </div>`;
-  }).join('');
-  // 兜底：任何不在标准阶段列表里的状态（如历史「寄样中」记录）单独成列，避免数据在看板消失
-  const known = new Set(INQ_STATUSES);
-  const orphanStats = [...new Set(filtered.map((q) => q.status || '新询盘').filter((s) => !known.has(s)))];
-  const orphanCols = orphanStats.map((st) => {
-    const items = filtered.filter((q) => (q.status || '新询盘') === st)
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    return `
-      <div class="kanban-col kanban-col--orphan" data-status="${esc(st)}">
-        <div class="kanban-col-head">
-          <span class="lh" style="font-weight:600;color:var(--ink-soft)">${esc(st)}</span>
-          <span class="count">${items.length}</span>
-        </div>
-        <div class="kanban-cards" data-status="${esc(st)}">
-        ${items.length === 0 ? '<div class="empty" style="padding:14px">—</div>' : items.map(cardHtml).join('')}
-        </div>
-      </div>`;
-  }).join('');
-  wrap.innerHTML = cols + orphanCols;
-  wrap.querySelectorAll('.kc').forEach((el) => {
-    el.setAttribute('draggable', 'true');
-    el.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', el.dataset.id);
-      el.style.opacity = '0.5';
-    });
-    el.addEventListener('dragend', () => { el.style.opacity = ''; });
-    el.addEventListener('click', (e) => {
-      const link = e.target.closest('.link-name');
-      if (link) { e.preventDefault(); openInqDetail(el.dataset.id); return; }
-      const linkButton=e.target.closest('[data-inq-links]');if(linkButton){e.stopPropagation();openInquiryLinks(linkButton.dataset.inqLinks);return;}
-      openInqDetail(el.dataset.id);
-    });
-  });
-  wrap.querySelectorAll('.kanban-cards').forEach((col) => {
-    col.addEventListener('dragover', (e) => { e.preventDefault(); col.closest('.kanban-col').classList.add('drag-over'); });
-    col.addEventListener('dragleave', () => { col.closest('.kanban-col').classList.remove('drag-over'); });
-    col.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      col.closest('.kanban-col').classList.remove('drag-over');
-      const id = e.dataTransfer.getData('text/plain');
-      const newStatus = col.dataset.status;
-      if (!id || !newStatus) return;
-      const item = inquiries.find((q) => q.id === id);
-      const oldStatus = item ? (item.status || '新询盘') : '';
-      if (oldStatus === newStatus) return;
-      // 状态变更统一走 changeInqStatus（必填原因 / stageLog / wonAt 口径一致）
-      await changeInqStatus(id, newStatus);
-    });
-  });
-}
+function renderInqBoard() { if(window.crmEnquiryRender)window.crmEnquiryRender(); }
 
 // ===== 询盘状态变更（看板拖拽 / 清单行内下拉共用，v20260902d）=====
 // 决策点C：强制填写变更原因，与看板同一套 stageLog / wonAt 口径
 async function changeInqStatus(id, newStatus, opts = {}) {
+  if(window.crmChangeInquiryStage)return window.crmChangeInquiryStage(id,newStatus,opts);
   const item = inquiries.find((x) => x.id === id);
   const oldStatus = item ? (item.status || '新询盘') : '';
   if (!item || oldStatus === newStatus) return true;
@@ -218,21 +160,7 @@ async function updateInqFollowInline(id, val, el) {
   } catch { toast('保存失败'); if (el) el.value = prev; }
 }
 
-function cardHtml(q) {
-  const amt = q.expectedAmount ? `${Number(q.expectedAmount).toLocaleString()} ${esc(q.currency || 'USD')}` : '';
-  const next = q.nextFollowAt ? fmtDateShort(q.nextFollowAt) : '';
-  return `<div class="kc" data-id="${q.id}">
-    <div class="kco"><a class="link-name" data-detail-name="${esc(displayClientName(q))}" title="查看客户详情">${esc(displayClientName(q))}</a></div>
-    <div class="kmeta">${esc(q.country || '')} · ${esc(q.product || '—')}</div>
-    ${inquiryLinkSummary(q)}
-    ${q.lastStageReason?`<div class="inq-latest-reason" title="${esc(q.lastStageReason)}">变更原因：${esc(q.lastStageReason)}</div>`:''}
-    <div class="kfoot">
-      <span class="kamt">${amt}</span>
-      <span class="kflag">${esc(q.status || '新询盘')}</span>
-      ${next ? `<span class="kflag">📅 ${next}</span>` : ''}
-    </div>
-  </div>`;
-}
+function cardHtml(q) { return window.crmInquiryCard?.(q)||''; }
 
 function inqSearch(list) {
   if (!inqSearchQ) return list;
@@ -814,7 +742,7 @@ window.addEventListener('ftw:dataReady', () => {
 window.refreshInquiries = loadInquiries;
 window.getInquiryById = (id) => inquiries.find((x) => x.id === id);
 window.getInquiriesByClient = (company) => inquiries.filter((x) => (x.clientName || '') === (company || ''));
-window.getAllInquiries = () => inquiries;
+window.getAllInquiries = () => window.__crmInquiryDataOwner===currentUser?.id?inquiries:[];
 window.openInqModal = openInqModal;
 
 // ===== 清单事件委托（v20260902d）：一次绑定永久生效，重渲染/旧缓存都不再丢交互 =====
@@ -881,12 +809,14 @@ window.openInqModal = openInqModal;
 
 // 询盘批量：勾选后只更新顶部「批量编辑 / 批量删除」按钮的计数与高亮，实际编辑走弹窗
 function renderInqBatchBar() {
+  if(window.crmEnquiryBatch)return window.crmEnquiryBatch();
   const valid=new Set(inquiries.map(q=>q.id));for(const id of inqSelected)if(!valid.has(id))inqSelected.delete(id);
   const n=inqSelected.size;
   for(const [id,label] of [['inqBatchEdit','批量编辑'],['inqBatchDelete','批量删除']]){const b=$('#'+id);if(b){b.textContent=label+(n?' ('+n+')':'');b.disabled=!n;}}
   if($('#inqSelectionMeta'))$('#inqSelectionMeta').textContent=n?'已选择 '+n+' 条':'选择后可批量操作';
   if($('#inqClearSelection'))$('#inqClearSelection').hidden=!n;
-  const all=$('#cbInqAll');if(all){const rows=[...document.querySelectorAll('#inqListBody .cb-inq')],selected=rows.filter(r=>inqSelected.has(r.dataset.iid)).length;all.checked=rows.length>0&&selected===rows.length;all.indeterminate=selected>0&&selected<rows.length;}
+  const mobile=$('#inqSelectPageMobile');
+  const all=$('#cbInqAll');if(all){const rows=[...document.querySelectorAll('#inqListBody .cb-inq')],selected=rows.filter(r=>inqSelected.has(r.dataset.iid)).length;all.checked=rows.length>0&&selected===rows.length;all.indeterminate=selected>0&&selected<rows.length;if(mobile){mobile.checked=all.checked;mobile.indeterminate=all.indeterminate;}}
 }
 // 兼容旧调用名
 function bindInqBatchBar() {}
