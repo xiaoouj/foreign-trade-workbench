@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "阿里客服读取器 · 外贸人工作台",
+  "version": "1.1.2",
+  "description": "读取阿里国际站客服聊天页（message.alibaba.com / onetalk.alibaba.com）的买家信息与消息记录，匹配工作台客户、AI 提炼进度小结并支持未知客户一键建档。",
+  "action": {
+    "default_title": "打开阿里客服读取器"
+  },
+  "permissions": ["sidePanel", "storage", "tabs", "downloads", "webNavigation"],
+  "host_permissions": [
+    "https://message.alibaba.com/*",
+    "https://onetalk.alibaba.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://message.alibaba.com/*"],
+      "js": ["src/reader.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": ["https://onetalk.alibaba.com/*"],
+      "js": ["src/reader.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": ["https://message.alibaba.com/*"],
+      "js": ["src/page-probe.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://onetalk.alibaba.com/*"],
+      "js": ["src/page-probe.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ]
+}

@@ -60,6 +60,12 @@ docker compose up -d --build
 
 默认仅绑定本机 `127.0.0.1:4173`，数据写入命名卷 `workbench-data`。需要局域网访问时明确设置 `FTW_BIND_ADDRESS`；公开网络部署应置于 HTTPS 反向代理和访问控制之后。升级使用 `docker compose up -d --build`；备份前核对命名卷，不要用 `down -v` 清除业务数据。
 
+## 阿里客服助手
+
+Chrome 扩展 1.1.2 支持从阿里国际站客服页面读取对话、匹配 CRM 客户并在确认后同步。
+
+[安装与配置说明](extensions/alibaba-cs-helper/README.md) · [下载扩展 ZIP](docs/downloads/alibaba-cs-helper-1.1.2.zip)
+
 ## AI 与外部服务
 
 CRM 基础功能不需要 AI 密钥。在“AI 助手设置”中配置自己的 OpenAI 兼容地址、模型与密钥。使用 AI 时，提交的文档文字或业务上下文会发送到所配置的服务；也可使用自托管服务。

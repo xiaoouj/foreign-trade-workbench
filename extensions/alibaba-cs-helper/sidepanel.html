@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>阿里客服读取器 · 外贸人工作台</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">阿</div>
+      <div>
+        <h1>阿里客服助手</h1>
+        <p>客户匹配 · 进度同步 · AI 建档</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="statusBadge" class="badge badge-gray">等待读取</span>
+      <button id="refreshBtn" class="btn btn-primary" title="重新读取当前页面">刷新</button>
+    </div>
+  </header>
+
+  <section class="card wb-bar" id="wbBar">
+    <div class="wb-bar-row">
+      <div class="wb-bar-left">
+        <span id="wbConnBadge" class="badge badge-gray">工作台未连接</span>
+        <span id="wbUserLabel" class="wb-user"></span>
+      </div>
+      <div class="actions">
+        <button id="wbOpenBtn" class="btn btn-sm btn-ghost" type="button" title="打开工作台">工作台 ↗</button>
+        <button id="wbToggleBtn" class="btn btn-sm" type="button">连接设置</button>
+      </div>
+    </div>
+    <div id="wbPanel" class="wb-panel hidden">
+      <div class="crm-field">
+        <label>主地址（固定内网 IP）</label>
+        <input id="wbUrlInput" class="crm-input" placeholder="http://localhost:4173" />
+      </div>
+      <div class="crm-field">
+        <label>备用隧道地址（内网不通时自动切换）</label>
+        <input id="wbFallbackInput" class="crm-input" placeholder="如 https://crm.example.com（选填）" />
+      </div>
+      <div id="wbLoginBox" class="hidden">
+        <div class="crm-grid">
+          <div class="crm-field">
+            <label>账号</label>
+            <input id="wbUsername" class="crm-input" placeholder="用户名" />
+          </div>
+          <div class="crm-field">
+            <label>密码</label>
+            <input id="wbPassword" class="crm-input" type="password" placeholder="密码" />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="wbLoginBtn" class="btn btn-sm btn-primary" type="button">登录工作台</button>
+          <span class="muted">若已在浏览器登录工作台，点“重连检测”即可自动识别。</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="wbReconnectBtn" class="btn btn-sm" type="button">保存地址并重连</button>
+        <button id="wbLogoutBtn" class="btn btn-sm hidden" type="button">退出登录</button>
+      </div>
+    </div>
+  </section>
+
+  <main id="main">
+    <section id="emptyState" class="empty">
+      <div class="empty-icon">💬</div>
+      <h2>请在阿里客服聊天页打开</h2>
+      <p>支持页面：<code>message.alibaba.com/message/maDetail.htm?imInquiryId=...</code> 以及 <code>onetalk.alibaba.com</code>。</p>
+      <p class="hint">打开客户的询盘详情/聊天窗口后，点右上角「刷新」。</p>
+    </section>
+
+    <div id="content" class="content hidden">
+      <section class="meta card">
+        <div class="meta-row">
+          <div class="meta-item">
+            <span class="meta-label">询盘 ID</span>
+            <strong id="inquiryId">—</strong>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">消息数</span>
+            <strong id="messageCount">0</strong>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">最后消息</span>
+            <strong id="lastMessageAt">—</strong>
+          </div>
+        </div>
+        <div class="subject" id="subject"></div>
+        <div class="url" id="pageUrl"></div>
+      </section>
+
+      <section id="crmCard" class="card crm-card hidden">
+        <div class="section-head">
+          <h2>工作台客户同步</h2>
+          <span id="crmSyncBadge" class="badge badge-gray">检测中</span>
+        </div>
+
+        <div id="crmNeedLogin" class="muted hidden">请先在上方「连接设置」登录工作台账号，即可自动匹配客户并同步聊天进度。</div>
+
+        <!-- 状态 1：已匹配到工作台客户 -->
+        <div id="crmMatched" class="hidden">
+          <div class="crm-client-banner">
+            <div>
+              <div class="crm-client-name" id="crmClientName">—</div>
+              <div class="crm-client-sub" id="crmClientMeta">—</div>
+            </div>
+            <span id="crmMatchTypeBadge" class="badge badge-blue">已匹配</span>
+          </div>
+
+          <div id="crmRecentComm" class="crm-recent hidden"></div>
+
+          <div class="crm-grid">
+            <div class="crm-field">
+              <label>记在业务员名下</label>
+              <select id="crmOwnerSelect" class="crm-select"></select>
+            </div>
+            <div class="crm-field">
+              <label>关联询盘 / 商机</label>
+              <select id="crmInquirySelect" class="crm-select"></select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="crmAnalyzeSyncBtn" class="btn btn-primary" type="button">✨ AI 提取进度小结</button>
+            <button id="crmRebindToggleBtn" class="btn btn-sm" type="button">换绑客户</button>
+          </div>
+
+          <div id="crmRebindBox" class="crm-subbox hidden" style="margin-top:8px">
+            <input id="crmRebindSearch" class="crm-input" placeholder="输入公司名/联系人过滤…" />
+            <select id="crmRebindSelect" class="crm-select"></select>
+            <div class="actions">
+              <button id="crmRebindSaveBtn" class="btn btn-sm btn-primary" type="button">确认换绑</button>
+              <button id="crmRebindCancelBtn" class="btn btn-sm" type="button">取消</button>
+            </div>
+          </div>
+
+          <div id="crmSyncPreview" class="crm-preview hidden">
+            <div class="crm-field">
+              <label>进度小结（45字内，可修改）</label>
+              <textarea id="crmSyncSummary" class="crm-textarea" rows="2"></textarea>
+            </div>
+            <div id="crmSyncInqFields" class="crm-grid">
+              <div class="crm-field">
+                <label>商机阶段</label>
+                <select id="crmSyncStatus" class="crm-select">
+                  <option value="新询盘">新询盘</option>
+                  <option value="已报价">已报价</option>
+                  <option value="等回复">等回复</option>
+                  <option value="谈判中">谈判中</option>
+                  <option value="成交">成交</option>
+                  <option value="输单">输单</option>
+                  <option value="暂缓">暂缓</option>
+                  <option value="无效">无效</option>
+                </select>
+              </div>
+              <div class="crm-field">
+                <label>下次跟进日期</label>
+                <input id="crmSyncNextDate" class="crm-input" type="date" />
+              </div>
+            </div>
+            <div id="crmSyncNewInqExtra" class="crm-grid hidden">
+              <div class="crm-field">
+                <label>需求产品</label>
+                <input id="crmSyncProduct" class="crm-input" placeholder="产品名称" />
+              </div>
+              <div class="crm-field">
+                <label>预计金额</label>
+                <input id="crmSyncAmount" class="crm-input" type="number" min="0" step="0.01" placeholder="选填" />
+              </div>
+            </div>
+            <label class="crm-check"><input id="crmSyncTaskChk" type="checkbox" /> 同时生成跟进待办</label>
+            <div id="crmSyncTaskFields" class="crm-grid hidden">
+              <div class="crm-field">
+                <label>待办内容</label>
+                <input id="crmSyncTaskAction" class="crm-input" placeholder="下一步动作" />
+              </div>
+              <div class="crm-field">
+                <label>截止日期</label>
+                <input id="crmSyncTaskDue" class="crm-input" type="date" />
+              </div>
+            </div>
+            <div id="crmSyncReplyWrap" class="hidden">
+              <div class="section-head" style="margin-bottom:4px">
+                <span class="muted">🤖 AI 回复建议</span>
+                <button id="crmSyncCopyReply" class="btn btn-sm" type="button">复制回复</button>
+              </div>
+              <div id="crmSyncReplyText" class="crm-reply-box"></div>
+            </div>
+            <div class="actions">
+              <button id="crmCommitSyncBtn" class="btn btn-success" type="button">✅ 确认写入工作台</button>
+              <button id="crmCancelSyncBtn" class="btn btn-sm" type="button">收起</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 状态 2：未匹配到工作台客户（未知客户） -->
+        <div id="crmUnmatched" class="hidden">
+          <p class="muted" style="margin:0 0 8px">后台未匹配到此客户，你可以关联已有客户，或一键识别信息建档（仅确认后写入）。</p>
+          <div id="crmCandidatesWrap" class="hidden">
+            <div class="muted" style="margin-bottom:4px">可能匹配的已有客户：</div>
+            <div id="crmCandidates" class="crm-candidates"></div>
+          </div>
+          <div class="crm-subbox" style="margin-bottom:10px">
+            <div class="crm-field" style="margin-bottom:4px">
+              <label>关联到已有客户</label>
+              <input id="crmBindSearch" class="crm-input" placeholder="搜索公司名 / 联系人 / 邮箱…" />
+            </div>
+            <div class="actions">
+              <select id="crmBindSelect" class="crm-select" style="flex:1"></select>
+              <button id="crmBindBtn" class="btn btn-sm btn-ghost" type="button">🔗 绑定客户</button>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="crmAnalyzeCreateBtn" class="btn btn-primary" type="button">✨ AI 识别并一键建档</button>
+          </div>
+
+          <div id="crmCreatePreview" class="crm-preview hidden">
+            <div class="crm-field">
+              <label>客户公司 / 名称 *</label>
+              <input id="crmNewCompany" class="crm-input" placeholder="公司名称或买家姓名" />
+            </div>
+            <div class="crm-grid">
+              <div class="crm-field">
+                <label>联系人</label>
+                <input id="crmNewContact" class="crm-input" />
+              </div>
+              <div class="crm-field">
+                <label>国家</label>
+                <input id="crmNewCountry" class="crm-input" />
+              </div>
+              <div class="crm-field">
+                <label>邮箱</label>
+                <input id="crmNewEmail" class="crm-input" />
+              </div>
+              <div class="crm-field">
+                <label>电话</label>
+                <input id="crmNewPhone" class="crm-input" />
+              </div>
+            </div>
+            <div class="crm-field">
+              <label>归属业务员</label>
+              <select id="crmCreateOwnerSelect" class="crm-select"></select>
+            </div>
+            <label class="crm-check"><input id="crmNewInqChk" type="checkbox" checked /> 同时创建询盘 / 商机</label>
+            <div id="crmNewInqBox" class="crm-subbox">
+              <div class="crm-grid">
+                <div class="crm-field">
+                  <label>需求产品</label>
+                  <input id="crmNewProduct" class="crm-input" placeholder="如：链板输送机" />
+                </div>
+                <div class="crm-field">
+                  <label>阶段</label>
+                  <select id="crmNewInqStatus" class="crm-select">
+                    <option value="新询盘">新询盘</option>
+                    <option value="已报价">已报价</option>
+                    <option value="等回复">等回复</option>
+                    <option value="谈判中">谈判中</option>
+                  </select>
+                </div>
+                <div class="crm-field">
+                  <label>预计金额</label>
+                  <input id="crmNewAmount" class="crm-input" type="number" min="0" step="0.01" placeholder="选填" />
+                </div>
+                <div class="crm-field">
+                  <label>币种</label>
+                  <input id="crmNewCurrency" class="crm-input" value="USD" />
+                </div>
+              </div>
+              <div class="crm-grid">
+                <div class="crm-field">
+                  <label>型号 / 规格</label>
+                  <input id="crmNewModel" class="crm-input" />
+                </div>
+                <div class="crm-field">
+                  <label>下次跟进日期</label>
+                  <input id="crmNewNextDate" class="crm-input" type="date" />
+                </div>
+              </div>
+            </div>
+            <div class="crm-field">
+              <label>首条沟通进度小结</label>
+              <textarea id="crmNewSummary" class="crm-textarea" rows="2"></textarea>
+            </div>
+            <label class="crm-check"><input id="crmNewTaskChk" type="checkbox" /> 同时生成跟进待办</label>
+            <div id="crmNewTaskBox" class="crm-grid hidden">
+              <div class="crm-field">
+                <label>待办内容</label>
+                <input id="crmNewTaskAction" class="crm-input" />
+              </div>
+              <div class="crm-field">
+                <label>截止日期</label>
+                <input id="crmNewTaskDue" class="crm-input" type="date" />
+              </div>
+            </div>
+            <div id="crmNewReplyWrap" class="hidden">
+              <div class="section-head" style="margin-bottom:4px">
+                <span class="muted">🤖 AI 回复建议</span>
+                <button id="crmNewCopyReply" class="btn btn-sm" type="button">复制回复</button>
+              </div>
+              <div id="crmNewReplyText" class="crm-reply-box"></div>
+            </div>
+            <div id="crmDupBox" class="crm-warn-box hidden">
+              <div id="crmDupText"></div>
+              <div class="actions">
+                <button id="crmDupBindBtn" class="btn btn-sm btn-primary" type="button">直接关联该客户</button>
+                <button id="crmDupForceBtn" class="btn btn-sm" type="button">仍新建客户</button>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="crmCommitCreateBtn" class="btn btn-success" type="button">✅ 确认建档并绑定</button>
+              <button id="crmCancelCreateBtn" class="btn btn-sm" type="button">取消</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="buyerCard" class="card buyer-card">
+        <div class="section-head">
+          <h2>买家信息</h2>
+          <span id="ownerBadge" class="badge badge-blue">—</span>
+        </div>
+        <div class="buyer-head">
+          <div class="avatar" id="buyerAvatar">?</div>
+          <div class="buyer-title">
+            <strong id="buyerName">—</strong>
+            <span id="buyerCountry">—</span>
+          </div>
+          <a id="customerDetailLink" class="link" href="#" target="_blank" rel="noreferrer">客户详情 ↗</a>
+        </div>
+        <dl class="fields">
+          <div><dt>公司名称</dt><dd id="buyerCompany">—</dd></div>
+          <div><dt>邮箱</dt><dd id="buyerEmail">—</dd></div>
+          <div><dt>注册时间</dt><dd id="buyerRegisteredAt">—</dd></div>
+          <div><dt>买家标签</dt><dd id="buyerTags">—</dd></div>
+          <div><dt>买家特征</dt><dd id="buyerFeatures">—</dd></div>
+        </dl>
+      </section>
+
+      <section id="conversationCard" class="card hidden">
+        <div class="section-head">
+          <h2>会话列表</h2>
+          <span id="conversationCount" class="muted"></span>
+        </div>
+        <div id="conversationList" class="conv-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <h2>聊天记录</h2>
+          <span class="muted" id="messageStats"></span>
+        </div>
+        <div id="messageList" class="message-list"></div>
+      </section>
+
+      <section class="card actions-card">
+        <div class="section-head">
+          <h2>导出与诊断</h2>
+          <span class="muted">支持本地复制 JSON</span>
+        </div>
+        <div class="actions">
+          <button id="copyJsonBtn" class="btn" type="button">复制 JSON</button>
+          <button id="downloadJsonBtn" class="btn" type="button">下载 JSON</button>
+          <button id="diagnoseBtn" class="btn btn-ghost" type="button">复制脱敏结构</button>
+        </div>
+        <pre id="diagnoseOutput" class="diagnose hidden"></pre>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -49,3 +49,8 @@ playwright-report/
 !public/category-images/*.png
 
 !docs/screenshots/tasks-synthetic.jpg
+
+# Browser extension artwork shipped with the public installer.
+!extensions/alibaba-cs-helper/icons/icon16.png
+!extensions/alibaba-cs-helper/icons/icon48.png
+!extensions/alibaba-cs-helper/icons/icon128.png
